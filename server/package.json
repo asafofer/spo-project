@@ -1,0 +1,24 @@
+{
+  "name": "prebid-data-collector-server",
+  "version": "0.1.0",
+  "module": "index.ts",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "description": "Mock endpoint server for collecting Prebid.js events",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun run index.ts",
+    "view-data": "bun run scripts/view-data.ts",
+    "delete-data": "bun run scripts/delete-data.ts",
+    "drop-table": "bun run scripts/drop-table.ts"
+  },
+  "type": "module",
+  "dependencies": {
+    "@duckdb/node-api": "^1.4.2-r.1",
+    "cli-table3": "^0.6.5"
+  }
+}
