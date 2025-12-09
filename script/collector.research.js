@@ -29,6 +29,7 @@
     function handleBidRequested (bidderRequest) {
         var bids = bidderRequest.bids.map(function (bid) {
             return {
+                eventType: 'bidReuqest',
                 bidder: bid.bidder, // bidder name, e.g. pubmatic
                 adUnitCode: bid.adUnitCode, //ad unit name, e.g. skyscraper_atf_desktop-1
                 auctionId: bid.auctionId, // auction UUID, e.g. f135a729-0ab1-4c30-8097-8050dae01610
@@ -47,6 +48,7 @@
         var now = Date.now();
         var bids = timeoutedBids.map(function (bid) {
             return {
+                eventType: 'bidTimeout',
                 bidder: bid.bidder, // bidder name, e.g. pubmatic
                 adUnitCode: bid.adUnitCode, //ad unit name, e.g. skyscraper_atf_desktop-1
                 auctionId: bid.auctionId, // auction UUID, e.g. f135a729-0ab1-4c30-8097-8050dae01610
@@ -60,7 +62,7 @@
         send(bids); 
     }
 
-    function handleBidResponse (bidRepsonse) {
+    function handleBidResponse (event, bidRepsonse) {
         var bid = {
             bidder,
             adUnitCode,
@@ -75,6 +77,7 @@
             currency,
             status, // is "rendered" when won
         } = bidRepsonse;
+        bid.eventType = event;
         // queue?
         send([bid]);
     }
@@ -89,8 +92,8 @@
                 // here, data is an array of "bid" (request per specfic ad unit) objects
                 return handleBidTimeout(data);
             }
-            // here, data is a bid response object (per specific ad unit)
-            return handleBidResponse(data);
+            // all other events emit bid response object (per specific ad unit)
+            return handleBidResponse(event, data);
         }
     }
 
