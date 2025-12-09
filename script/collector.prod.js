@@ -9,6 +9,83 @@
   window.pbjs = window.pbjs || {};
   window.pbjs.que = window.pbjs.que || [];
 
+  // Session and pageview management
+  var sessionKey = "__sid__"; // Session storage key (don't collide with other scripts)
+  var pageviewID = null; // Generated on script load
+
+  /**
+   * Generate a UUID v4
+   * @returns {string} UUID string
+   */
+  function generateUUID() {
+    return crypto.randomUUID();
+  }
+
+  /**
+   * Get or create session ID from sessionStorage
+   * Session persists across page reloads but not across browser sessions
+   * @returns {string} Session ID
+   */
+  function getSessionId() {
+    try {
+      var sessionId = sessionStorage.getItem(sessionKey);
+      if (!sessionId) {
+        sessionId = generateUUID();
+        sessionStorage.setItem(sessionKey, sessionId);
+      }
+      return sessionId;
+    } catch (error) {
+      // sessionStorage throws in private browsing mode or when disabled
+      // Generate a temporary session ID that won't persist
+      return generateUUID();
+    }
+  }
+
+  /**
+   * Generate pageview ID on script load
+   * Each page load gets a new pageview ID
+   */
+  pageviewID = generateUUID();
+
+  /**
+   * Get current domain
+   * @returns {string} Domain name
+   */
+  function getDomain() {
+    try {
+      return window.location.hostname || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Extract common bid fields and add required parameters
+   * Unifies common bid extraction and required params enrichment
+   * @param {Object} bid - The bid object
+   * @param {Object} event - The event object (optional, for fallback values)
+   * @returns {Object} Object with common bid fields and required params
+   */
+  function extractCommonBidFields(bid, event) {
+    return {
+      // Common bid fields
+      adUnitCode: bid ? bid.adUnitCode || null : null,
+      adUnitRequestSizes: bid ? bid.sizes || null : null,
+      adUnitFormat:
+        bid && bid.mediaTypes ? Object.keys(bid.mediaTypes)[0] || null : null,
+      mediaTypes: bid && bid.mediaTypes ? Object.keys(bid.mediaTypes) : null,
+      bidId: bid ? bid.bidId || null : null,
+      auctionId: bid
+        ? bid.auctionId || (event && event.auctionId) || null
+        : (event && event.auctionId) || null,
+      // Required params
+      sessionId: getSessionId(),
+      pageViewId: (event && event.pageViewId) || pageviewID,
+      domain: getDomain(),
+      timestamp: Date.now(), // Will be overridden by event-specific timestamp if provided
+    };
+  }
+
   /**
    * Locate Prebid instance from _pbjsGlobals namespace array
    * Prebid can have multiple instances, so we check the global namespace
@@ -110,48 +187,24 @@
 
   /**
    * Send formatted event data to backend endpoint
-   * @param {Object} formattedData - The formatted event data
+   * @param {Object|Array} formattedData - The formatted event data (single object or array)
    */
   function sendEventToEndpoint(formattedData) {
+    var dataArray = Array.isArray(formattedData)
+      ? formattedData
+      : [formattedData];
+
     // Send to endpoint (fire and forget - don't block)
     fetch("http://localhost:3001/events", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify([formattedData]),
+      body: JSON.stringify(dataArray),
     }).catch(function (error) {
       // Silently fail - don't log errors to avoid console spam
       // In production, you might want to queue failed requests for retry
     });
-  }
-
-  /**
-   * Format bidRequested event data for backend
-   * @param {Object} event - The bidRequested event
-   * @returns {Object} Formatted data matching spec requirements
-   */
-  function formatBidRequestedData(event) {
-    var bid = event.bids && event.bids[0] ? event.bids[0] : null;
-    var ortb2 = event.ortb2 || (bid && bid.ortb2) || {};
-
-    return {
-      // Available from bidRequested event
-      eventType: "bidRequested",
-      requestId: event.auctionId || null,
-      pageViewId: event.pageViewId || null,
-      bidderCode: event.bidderCode || null,
-      adUnitCode: bid ? bid.adUnitCode || null : null,
-      adUnitRequestSizes: bid ? bid.sizes || null : null,
-      adUnitFormat:
-        bid && bid.mediaTypes ? Object.keys(bid.mediaTypes)[0] || null : null,
-      userAgent: ortb2.device ? ortb2.device.ua || null : null,
-      domain: ortb2.site ? ortb2.site.domain || null : null,
-      pbjsTimeout: event.timeout || null,
-      timestamp: event.auctionStart || event.start || null,
-      bidderRequestId: event.bidderRequestId || null,
-      sessionId: null, // TODO: Get from Prebid or partner's system
-    };
   }
 
   /**
@@ -161,23 +214,43 @@
    */
   function handleBidRequested(event, namespace) {
     console.log(`[Collector Event] ${namespace} bidRequested (raw):`, event);
-    var formattedData = formatBidRequestedData(event);
+
+    var bids = event.bids || [];
+    var ortb2 = event.ortb2 || {};
+
+    // Map over all bids to create one event per bid
+    var formattedDataArray = bids.map(function (bid) {
+      var bidOrtb2 = bid.ortb2 || ortb2;
+      var commonFields = extractCommonBidFields(bid, event);
+      return Object.assign({}, commonFields, {
+        eventType: "bidRequested",
+        requestId: event.auctionId || null,
+        bidderCode: event.bidderCode || null,
+        userAgent: bidOrtb2.device ? bidOrtb2.device.ua || null : null,
+        domain: (bidOrtb2.site && bidOrtb2.site.domain) || commonFields.domain,
+        pbjsTimeout: event.timeout || null,
+        timestamp: event.auctionStart || event.start || commonFields.timestamp,
+        bidderRequestId: event.bidderRequestId || null,
+      });
+    });
+
     console.log(
       `[Collector Event] ${namespace} bidRequested (formatted):`,
-      formattedData
+      formattedDataArray
     );
-    sendEventToEndpoint(formattedData);
+    sendEventToEndpoint(formattedDataArray);
   }
 
   /**
-   * Format bidderDone event data for backend
+   * Handle bidderDone event
    * @param {Object} event - The bidderDone event
-   * @returns {Object} Formatted data matching spec requirements
+   * @param {string} namespace - The namespace name
    */
-  function formatBidderDoneData(event) {
-    var bid = event.bids && event.bids[0] ? event.bids[0] : null;
-    var metrics = event.metrics || (bid && bid.metrics) || {};
-    var ortb2 = event.ortb2 || (bid && bid.ortb2) || {};
+  function handleBidderDone(event, namespace) {
+    console.log(`[Collector Event] ${namespace} bidderDone (raw):`, event);
+
+    var bids = event.bids || [];
+    var metrics = event.metrics || {};
 
     // Extract latency from metrics (bidder response time)
     var latencyMs = null;
@@ -201,36 +274,83 @@
       bidderResponseTime = metrics["adapter.client.total"];
     }
 
-    return {
-      // Available from bidderDone event
-      eventType: "bidderDone",
-      requestId: event.auctionId || null,
-      pageViewId: event.pageViewId || null,
-      bidderCode: event.bidderCode || null,
-      adUnitCode: bid ? bid.adUnitCode || null : null,
-      adUnitRequestSizes: bid ? bid.sizes || null : null,
-      adUnitFormat:
-        bid && bid.mediaTypes ? Object.keys(bid.mediaTypes)[0] || null : null,
-      userAgent: ortb2.device ? ortb2.device.ua || null : null,
-      domain: ortb2.site ? ortb2.site.domain || null : null,
-      timestamp: event.timestamp || Date.now(),
-      bidderRequestId: event.bidderRequestId || null,
-      latencyMs: latencyMs,
-      bidderResponseTime: bidderResponseTime,
-      sessionId: null, // TODO: Get from Prebid or partner's system
-    };
+    // Map over all bids to create one event per bid
+    var formattedDataArray = bids.map(function (bid) {
+      var bidMetrics = bid.metrics || metrics;
+      var ortb2 = bid.ortb2 || event.ortb2 || {};
+
+      // Extract bid-specific latency if available
+      var bidLatencyMs = latencyMs;
+      if (bidMetrics["adapters.client." + event.bidderCode + ".net"]) {
+        var bidLatencyArray =
+          bidMetrics["adapters.client." + event.bidderCode + ".net"];
+        bidLatencyMs =
+          bidLatencyArray && bidLatencyArray.length > 0
+            ? bidLatencyArray[0]
+            : null;
+      }
+
+      var commonFields = extractCommonBidFields(bid, event);
+      return Object.assign({}, commonFields, {
+        eventType: "bidderDone",
+        requestId: event.auctionId || null,
+        bidderCode: event.bidderCode || null,
+        userAgent: ortb2.device ? ortb2.device.ua || null : null,
+        domain: (ortb2.site && ortb2.site.domain) || commonFields.domain,
+        timestamp: event.timestamp || commonFields.timestamp,
+        bidderRequestId: event.bidderRequestId || null,
+        latencyMs: bidLatencyMs || latencyMs,
+        bidderResponseTime: bidderResponseTime,
+      });
+    });
+
+    console.log(
+      `[Collector Event] ${namespace} bidderDone (formatted):`,
+      formattedDataArray
+    );
+    sendEventToEndpoint(formattedDataArray);
   }
 
   /**
-   * Handle bidderDone event
-   * @param {Object} event - The bidderDone event
+   * Handle bidResponse event
+   * @param {Object} bidResponse - The bidResponse object
    * @param {string} namespace - The namespace name
    */
-  function handleBidderDone(event, namespace) {
-    console.log(`[Collector Event] ${namespace} bidderDone (raw):`, event);
-    var formattedData = formatBidderDoneData(event);
+  function handleBidResponse(bidResponse, namespace) {
     console.log(
-      `[Collector Event] ${namespace} bidderDone (formatted):`,
+      `[Collector Event] ${namespace} bidResponse (raw):`,
+      bidResponse
+    );
+
+    var formattedData = {
+      eventType: "bidResponse",
+      requestId: bidResponse.auctionId || null,
+      auctionId: bidResponse.auctionId || null,
+      pageViewId: pageviewID,
+      bidderCode: bidResponse.bidder || null,
+      adUnitCode: bidResponse.adUnitCode || null,
+      adUnitRequestSizes: bidResponse.size ? [bidResponse.size] : null,
+      adUnitFormat: null, // Not available in bidResponse
+      mediaTypes: null, // Not available in bidResponse
+      bidId: bidResponse.bidId || bidResponse.requestId || null,
+      userAgent: null, // Not available in bidResponse
+      domain: getDomain(),
+      timestamp:
+        bidResponse.responseTimestamp ||
+        bidResponse.requestTimestamp ||
+        Date.now(),
+      bidderRequestId: null, // Not available in bidResponse
+      cpm: bidResponse.cpm || null,
+      currency: bidResponse.currency || null,
+      status: bidResponse.status || null,
+      requestTimestamp: bidResponse.requestTimestamp || null,
+      responseTimestamp: bidResponse.responseTimestamp || null,
+      timeToRespond: bidResponse.timeToRespond || null,
+      sessionId: getSessionId(),
+    };
+
+    console.log(
+      `[Collector Event] ${namespace} bidResponse (formatted):`,
       formattedData
     );
     sendEventToEndpoint(formattedData);
@@ -259,14 +379,34 @@
   }
 
   /**
-   * Handle bidTimeout event (placeholder)
-   * @param {Object} event - The bidTimeout event
+   * Handle bidTimeout event
+   * @param {Array} timeoutedBids - Array of timed-out bid objects
    * @param {string} namespace - The namespace name
    */
-  function handleBidTimeout(event, namespace) {
-    // TODO: Implement bidTimeout handler per spec.md line 17
-    // Extract: bidder code, timeout duration, auction ID, ad unit code
-    console.log(`[Collector Event] ${namespace} bidTimeout:`, event);
+  function handleBidTimeout(timeoutedBids, namespace) {
+    console.log(
+      `[Collector Event] ${namespace} bidTimeout (raw):`,
+      timeoutedBids
+    );
+
+    // Map over all timeouted bids to create one event per bid
+    var formattedDataArray = timeoutedBids.map(function (bid) {
+      var commonFields = extractCommonBidFields(bid, null);
+      return Object.assign({}, commonFields, {
+        eventType: "bidTimeout",
+        requestId: bid.auctionId || null,
+        bidderCode: bid.bidder || null,
+        userAgent: null, // Not available in timeout event
+        pbjsTimeout: bid.timeout || null,
+        bidderRequestId: bid.bidderRequestId || null,
+      });
+    });
+
+    console.log(
+      `[Collector Event] ${namespace} bidTimeout (formatted):`,
+      formattedDataArray
+    );
+    sendEventToEndpoint(formattedDataArray);
   }
 
   /**
@@ -332,14 +472,19 @@
       );
     }
 
+    try {
+      pbjs.onEvent("bidResponse", function (event) {
+        handleBidResponse(event, namespace);
+      });
+    } catch (error) {
+      console.error(
+        `[Collector] Error subscribing to ${namespace} bidResponse:`,
+        error
+      );
+    }
+
     // Other events (generic handlers)
-    var otherEventTypes = [
-      "auctionInit",
-      "auctionEnd",
-      "bidResponse",
-      "bidWon",
-      "seatNonBid",
-    ];
+    var otherEventTypes = ["auctionInit", "auctionEnd", "bidWon", "seatNonBid"];
 
     otherEventTypes.forEach(function (eventType) {
       try {
