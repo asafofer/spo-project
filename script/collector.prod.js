@@ -9,9 +9,13 @@
   window.pbjs = window.pbjs || {};
   window.pbjs.que = window.pbjs.que || [];
 
+  // Endpoint configuration
+  var ENDPOINT_URL = "http://localhost:3001/events";
+
   // Session and pageview management
   var sessionKey = "__sid__"; // Session storage key (don't collide with other scripts)
   var pageviewID = null; // Generated on script load
+  var cachedSessionId = null; // Cached session ID for when sessionStorage is unavailable
 
   /**
    * Generate a UUID v4
@@ -36,8 +40,11 @@
       return sessionId;
     } catch (error) {
       // sessionStorage throws in private browsing mode or when disabled
-      // Generate a temporary session ID that won't persist
-      return generateUUID();
+      // Cache the session ID in memory so all events in this page load share the same ID
+      if (!cachedSessionId) {
+        cachedSessionId = generateUUID();
+      }
+      return cachedSessionId;
     }
   }
 
@@ -185,26 +192,97 @@
     return instances;
   }
 
-  /**
-   * Send formatted event data to backend endpoint
-   * @param {Object|Array} formattedData - The formatted event data (single object or array)
-   */
-  function sendEventToEndpoint(formattedData) {
-    var dataArray = Array.isArray(formattedData)
-      ? formattedData
-      : [formattedData];
+  // Event queue: stores events grouped by auctionId
+  // Structure: { auctionId: [event1, event2, ...], ... }
+  var eventQueue = {};
 
-    // Send to endpoint (fire and forget - don't block)
-    fetch("http://localhost:3001/events", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(dataArray),
-    }).catch(function (error) {
-      // Silently fail - don't log errors to avoid console spam
-      // In production, you might want to queue failed requests for retry
+  /**
+   * Extract auctionId from event(s)
+   * @param {Object|Array} eventData - Single event or array of events
+   * @returns {string|null} Auction ID or null
+   */
+  function extractAuctionId(eventData) {
+    if (Array.isArray(eventData)) {
+      // Get auctionId from first event that has it
+      for (var i = 0; i < eventData.length; i++) {
+        var auctionId = eventData[i].auctionId || eventData[i].requestId;
+        if (auctionId) return auctionId;
+      }
+      return null;
+    }
+    return eventData.auctionId || eventData.requestId || null;
+  }
+
+  /**
+   * Add events to queue grouped by auctionId
+   * @param {Object|Array} eventData - Single event or array of events
+   */
+  function addToQueue(eventData) {
+    var events = Array.isArray(eventData) ? eventData : [eventData];
+    var auctionId = extractAuctionId(events);
+
+    if (!auctionId) {
+      // If no auctionId, use a fallback key for orphaned events
+      auctionId = "__orphaned__";
+    }
+
+    if (!eventQueue[auctionId]) {
+      eventQueue[auctionId] = [];
+    }
+
+    // Add all events to the queue for this auction
+    events.forEach(function (event) {
+      eventQueue[auctionId].push(event);
     });
+  }
+
+  /**
+   * Flush and send all events for a specific auction
+   * @param {string} auctionId - The auction ID to flush
+   */
+  function flushQueueByAuctionId(auctionId) {
+    if (!auctionId || !eventQueue[auctionId]) return;
+
+    var events = eventQueue[auctionId];
+    if (events.length > 0) {
+      fetch(ENDPOINT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(events),
+      })
+        .then(function () {
+          // Only remove from queue after successful send
+          delete eventQueue[auctionId];
+        })
+        .catch(function (error) {
+          // Silently fail - don't log errors to avoid console spam
+          // Events remain in queue for potential retry on next auctionEnd
+        });
+    }
+  }
+
+  /**
+   * Flush and send all queued events (for session end)
+   */
+  function flushAllQueuedEvents() {
+    var allEvents = [];
+    var auctionIds = Object.keys(eventQueue);
+
+    // Collect all events from all auctions
+    auctionIds.forEach(function (auctionId) {
+      allEvents = allEvents.concat(eventQueue[auctionId]);
+    });
+
+    if (allEvents.length > 0) {
+      // Use sendBeacon for session end (more reliable when page is unloading)
+      var jsonData = JSON.stringify(allEvents);
+      var blob = new Blob([jsonData], { type: "application/json" });
+      navigator.sendBeacon(ENDPOINT_URL, blob);
+      // Clear the queue
+      eventQueue = {};
+    }
   }
 
   /**
@@ -238,7 +316,7 @@
       `[Collector Event] ${namespace} bidRequested (formatted):`,
       formattedDataArray
     );
-    sendEventToEndpoint(formattedDataArray);
+    addToQueue(formattedDataArray);
   }
 
   /**
@@ -252,19 +330,6 @@
     var bids = event.bids || [];
     var metrics = event.metrics || {};
 
-    // Extract latency from metrics (bidder response time)
-    var latencyMs = null;
-    if (metrics["adapters.client." + event.bidderCode + ".net"]) {
-      var latencyArray =
-        metrics["adapters.client." + event.bidderCode + ".net"];
-      latencyMs =
-        latencyArray && latencyArray.length > 0 ? latencyArray[0] : null;
-    } else if (metrics["adapter.client.net"]) {
-      var latencyArray = metrics["adapter.client.net"];
-      latencyMs =
-        latencyArray && latencyArray.length > 0 ? latencyArray[0] : null;
-    }
-
     // Calculate bidder response time (total time for bidder)
     var bidderResponseTime = null;
     if (metrics["adapters.client." + event.bidderCode + ".total"]) {
@@ -276,19 +341,7 @@
 
     // Map over all bids to create one event per bid
     var formattedDataArray = bids.map(function (bid) {
-      var bidMetrics = bid.metrics || metrics;
       var ortb2 = bid.ortb2 || event.ortb2 || {};
-
-      // Extract bid-specific latency if available
-      var bidLatencyMs = latencyMs;
-      if (bidMetrics["adapters.client." + event.bidderCode + ".net"]) {
-        var bidLatencyArray =
-          bidMetrics["adapters.client." + event.bidderCode + ".net"];
-        bidLatencyMs =
-          bidLatencyArray && bidLatencyArray.length > 0
-            ? bidLatencyArray[0]
-            : null;
-      }
 
       var commonFields = extractCommonBidFields(bid, event);
       return Object.assign({}, commonFields, {
@@ -299,7 +352,6 @@
         domain: (ortb2.site && ortb2.site.domain) || commonFields.domain,
         timestamp: event.timestamp || commonFields.timestamp,
         bidderRequestId: event.bidderRequestId || null,
-        latencyMs: bidLatencyMs || latencyMs,
         bidderResponseTime: bidderResponseTime,
       });
     });
@@ -308,38 +360,39 @@
       `[Collector Event] ${namespace} bidderDone (formatted):`,
       formattedDataArray
     );
-    sendEventToEndpoint(formattedDataArray);
+    addToQueue(formattedDataArray);
   }
 
   /**
-   * Handle bidResponse event
-   * @param {Object} bidResponse - The bidResponse object
+   * Generic handler for bid response events (bidResponse, bidRejected, bidWon, etc.)
+   * @param {string} eventType - The event type name
+   * @param {Object} bidResponse - The bid response object
    * @param {string} namespace - The namespace name
    */
-  function handleBidResponse(bidResponse, namespace) {
+  function handleBidResponse(eventType, bidResponse, namespace) {
     console.log(
-      `[Collector Event] ${namespace} bidResponse (raw):`,
+      `[Collector Event] ${namespace} ${eventType} (raw):`,
       bidResponse
     );
 
     var formattedData = {
-      eventType: "bidResponse",
+      eventType: eventType,
       requestId: bidResponse.auctionId || null,
       auctionId: bidResponse.auctionId || null,
       pageViewId: pageviewID,
       bidderCode: bidResponse.bidder || null,
       adUnitCode: bidResponse.adUnitCode || null,
       adUnitRequestSizes: bidResponse.size ? [bidResponse.size] : null,
-      adUnitFormat: null, // Not available in bidResponse
-      mediaTypes: null, // Not available in bidResponse
+      adUnitFormat: null, // Not available in bid response events
+      mediaTypes: null, // Not available in bid response events
       bidId: bidResponse.bidId || bidResponse.requestId || null,
-      userAgent: null, // Not available in bidResponse
+      userAgent: null, // Not available in bid response events
       domain: getDomain(),
       timestamp:
         bidResponse.responseTimestamp ||
         bidResponse.requestTimestamp ||
         Date.now(),
-      bidderRequestId: null, // Not available in bidResponse
+      bidderRequestId: null, // Not available in bid response events
       cpm: bidResponse.cpm || null,
       currency: bidResponse.currency || null,
       status: bidResponse.status || null,
@@ -350,32 +403,10 @@
     };
 
     console.log(
-      `[Collector Event] ${namespace} bidResponse (formatted):`,
+      `[Collector Event] ${namespace} ${eventType} (formatted):`,
       formattedData
     );
-    sendEventToEndpoint(formattedData);
-  }
-
-  /**
-   * Handle bidRejected event (placeholder)
-   * @param {Object} event - The bidRejected event
-   * @param {string} namespace - The namespace name
-   */
-  function handleBidRejected(event, namespace) {
-    // TODO: Implement bidRejected handler per spec.md line 15
-    // Extract: bidder code, rejection reason, auction ID
-    console.log(`[Collector Event] ${namespace} bidRejected:`, event);
-  }
-
-  /**
-   * Handle bidderError event (placeholder)
-   * @param {Object} event - The bidderError event
-   * @param {string} namespace - The namespace name
-   */
-  function handleBidderError(event, namespace) {
-    // TODO: Implement bidderError handler per spec.md line 16
-    // Extract: bidder code, error type, error message, auction ID
-    console.log(`[Collector Event] ${namespace} bidderError:`, event);
+    addToQueue(formattedData);
   }
 
   /**
@@ -406,7 +437,7 @@
       `[Collector Event] ${namespace} bidTimeout (formatted):`,
       formattedDataArray
     );
-    sendEventToEndpoint(formattedDataArray);
+    addToQueue(formattedDataArray);
   }
 
   /**
@@ -415,18 +446,39 @@
    * @param {string} namespace - The namespace name (e.g., 'pbjs')
    */
   function subscribeToEvents(pbjs, namespace) {
-    // Specific handlers for key events
-    try {
-      pbjs.onEvent("bidRequested", function (event) {
-        handleBidRequested(event, namespace);
-      });
-    } catch (error) {
-      console.error(
-        `[Collector] Error subscribing to ${namespace} bidRequested:`,
-        error
-      );
-    }
+    // Events we care about
+    var events = [
+      "bidRequested",
+      "bidTimeout",
+      "bidResponse",
+      "bidRejected",
+      "bidWon",
+    ];
 
+    // Subscribe to events using the unified handler pattern
+    events.forEach(function (eventType) {
+      try {
+        pbjs.onEvent(eventType, function (data) {
+          if (eventType === "bidRequested") {
+            // data is a "bidderRequest" that contains multiple bids
+            return handleBidRequested(data, namespace);
+          }
+          if (eventType === "bidTimeout") {
+            // data is an array of "bid" (request per specific ad unit) objects
+            return handleBidTimeout(data, namespace);
+          }
+          // All other events emit bid response object (per specific ad unit)
+          return handleBidResponse(eventType, data, namespace);
+        });
+      } catch (error) {
+        console.error(
+          `[Collector] Error subscribing to ${namespace} ${eventType}:`,
+          error
+        );
+      }
+    });
+
+    // Keep bidderDone as separate handler (not in research list but we use it)
     try {
       pbjs.onEvent("bidderDone", function (event) {
         handleBidderDone(event, namespace);
@@ -438,53 +490,24 @@
       );
     }
 
-    // Placeholder handlers for spec.md lines 15-17
+    // Handle auctionEnd - flush queue for this auction
     try {
-      pbjs.onEvent("bidRejected", function (event) {
-        handleBidRejected(event, namespace);
+      pbjs.onEvent("auctionEnd", function (event) {
+        console.log(`[Collector Event] ${namespace} auctionEnd:`, event);
+        var auctionId = event.auctionId || null;
+        if (auctionId) {
+          flushQueueByAuctionId(auctionId);
+        }
       });
     } catch (error) {
       console.error(
-        `[Collector] Error subscribing to ${namespace} bidRejected:`,
+        `[Collector] Error subscribing to ${namespace} auctionEnd:`,
         error
       );
     }
 
-    try {
-      pbjs.onEvent("bidderError", function (event) {
-        handleBidderError(event, namespace);
-      });
-    } catch (error) {
-      console.error(
-        `[Collector] Error subscribing to ${namespace} bidderError:`,
-        error
-      );
-    }
-
-    try {
-      pbjs.onEvent("bidTimeout", function (event) {
-        handleBidTimeout(event, namespace);
-      });
-    } catch (error) {
-      console.error(
-        `[Collector] Error subscribing to ${namespace} bidTimeout:`,
-        error
-      );
-    }
-
-    try {
-      pbjs.onEvent("bidResponse", function (event) {
-        handleBidResponse(event, namespace);
-      });
-    } catch (error) {
-      console.error(
-        `[Collector] Error subscribing to ${namespace} bidResponse:`,
-        error
-      );
-    }
-
-    // Other events (generic handlers)
-    var otherEventTypes = ["auctionInit", "auctionEnd", "bidWon", "seatNonBid"];
+    // Other events (generic log only)
+    var otherEventTypes = ["auctionInit", "seatNonBid"];
 
     otherEventTypes.forEach(function (eventType) {
       try {
@@ -499,6 +522,15 @@
       }
     });
   }
+
+  // Setup session end handler using visibilitychange event
+  // Sends all queued events when page becomes hidden
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") {
+      // Page is being hidden - flush all queued events using sendBeacon
+      flushAllQueuedEvents();
+    }
+  });
 
   // Track which instances we've already subscribed to (avoid duplicates)
   var subscribedInstances = [];
