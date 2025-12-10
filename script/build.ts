@@ -5,6 +5,11 @@ const result = await Bun.build({
   target: 'browser',
   minify: true, // Minify for production
   sourcemap: 'external', // Useful for debugging
+  // 1. Inject IIFE start
+  banner: '(function() {',
+  
+  // 2. Inject IIFE end
+  footer: '})();',
 });
 
 if (!result.success) {
