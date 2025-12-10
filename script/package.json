@@ -1,0 +1,16 @@
+{
+  "name": "prebid-collector-script",
+  "module": "src/collctor.js",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "watch": "bun run --watch build.ts",
+    "serve": "bun run serve.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
