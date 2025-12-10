@@ -5,7 +5,7 @@ const ENDPOINT_URL = "http://localhost:3001/events";
 const MAX_RETRIES = 3;
 
 // Initialize Prebid queue if not present
-const pbjs = window.pbjs || {};
+window.pbjs = window.pbjs || {};
 pbjs.que = pbjs.que || [];
 
 // Buffer for events before flushing
@@ -32,9 +32,10 @@ function getBidData(bid, eventType) {
     adUnitCode: bid.adUnitCode,
     auctionId: bid.auctionId,
     requestId: bid.requestId,
-    bidId: bid.bidId || bid.requestId, // Normalize ID
+    bidId: bid.bidId,
     bidderRequestId: bid.bidderRequestId,
-    adUnitRequestSizes: bid.sizes || (bid.size ? [bid.size] : undefined),
+    adUnitRequestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined,
+    adUnitResponseSize: bid.size ? [bid.size] : undefined
   };
 }
 
@@ -59,6 +60,17 @@ function flushQueue() {
   requestQueue = []; // Clear immediately to prevent duplicates
 
   sendPayload(payload, 0);
+}
+
+// Mark all the events of an auction as completed
+function markEventsAsCompleted(auctionId) {
+  if (requestQueue.length === 0) return;
+  
+  requestQueue.forEach((event) => {
+    if (event.auctionId === auctionId) {
+      event.auctionStatus = 1;
+    }
+  });
 }
 
 // Send with retry logic
@@ -103,6 +115,7 @@ function handleBidTimeout(bids) {
 function handleBidResponse(eventType, bid) {
   const event = {
     ...getBidData(bid, eventType),
+    rejectionReason: bid.rejectionReason,
     requestTimestamp: bid.requestTimestamp,
     responseTimestamp: bid.responseTimestamp,
     timeToRespond: bid.timeToRespond,
@@ -135,7 +148,10 @@ pbjs.que.push(() => {
   });
 
   // Flush buffer when auction ends
-  pbjs.onEvent('auctionEnd', () => flushQueue());
+  pbjs.onEvent('auctionEnd', (auctionProperties) => {
+    markEventsAsCompleted(auctionProperties.auctionId);
+    flushQueue()
+  });
   
   logger.log("[Collector] Initialized");
 });
