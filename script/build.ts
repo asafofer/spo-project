@@ -1,5 +1,5 @@
 const result = await Bun.build({
-  entrypoints: ['./src/collector.js'],
+  entrypoints: ['./src/collector.research.js'],
   outdir: './dist',
   naming: 'collector.prod.js', // Force specific output name
   target: 'browser',

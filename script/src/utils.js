@@ -1,3 +1,6 @@
+  var sessionKey = "__sid__"; // Session storage key (don't collide with other scripts)
+  var cachedSessionId; // Cached session ID for when sessionStorage is unavailable
+
 /**
  * Generate a UUID v4
  * @returns {string} UUID string
