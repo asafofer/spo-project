@@ -116,6 +116,7 @@ function handleBidResponse(eventType, bid) {
   const event = {
     ...getBidData(bid, eventType),
     rejectionReason: bid.rejectionReason,
+    auctionStatus: eventType === "bidWon" ? 1 : 0,
     requestTimestamp: bid.requestTimestamp,
     responseTimestamp: bid.responseTimestamp,
     timeToRespond: bid.timeToRespond,
@@ -149,6 +150,7 @@ pbjs.que.push(() => {
 
   // Flush buffer when auction ends
   pbjs.onEvent('auctionEnd', (auctionProperties) => {
+    // NOTE: bidWon event are emitted after this point, so they aren't marked as complete
     markEventsAsCompleted(auctionProperties.auctionId);
     flushQueue()
   });
