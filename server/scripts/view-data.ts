@@ -24,16 +24,6 @@ async function viewData() {
     );
     const rows = result.getRowObjectsJS();
 
-    // Debug: Check first row timestamp
-    if (rows.length > 0) {
-      console.log(
-        "Debug - First row timestamp value:",
-        rows[0].timestamp,
-        "Type:",
-        typeof rows[0].timestamp
-      );
-    }
-
     if (rows.length === 0) {
       console.log("No data found in database.");
       conn.closeSync();
@@ -41,90 +31,101 @@ async function viewData() {
       return;
     }
 
+    // Get column names from the first row
+    const columnNames = Object.keys(rows[0]);
+
+    // Format column names for display (convert snake_case to Title Case)
+    const formatColumnName = (name: string): string => {
+      return name
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    };
+
+    const headers = columnNames.map(formatColumnName);
+    const colWidths = columnNames.map(() => 15); // Default width, can be adjusted
+
     // Display recent records in a table
     console.log("Recent records (last 100):\n");
     const recordsTable = new Table({
-      head: [
-        "Event Type",
-        "Request ID",
-        "Session ID",
-        "Page View ID",
-        "Bidder",
-        "Ad Unit",
-        "Format",
-        "Request Sizes",
-        "User Agent",
-        "Domain",
-        "pbjs Timeout",
-        "Bidder Req ID",
-        "Latency (ms)",
-        "Response Time (ms)",
-        "Timestamp",
-      ],
-      colWidths: [12, 18, 18, 18, 10, 12, 8, 15, 20, 15, 12, 18, 12, 14, 20],
+      head: headers,
+      colWidths: colWidths,
     });
 
-    rows.forEach((row: any) => {
-      var timestamp = "N/A";
-      if (row.timestamp != null) {
-        // timestamp is BIGINT (milliseconds)
-        // DuckDB returns BIGINT as BigInt type, convert to number
-        let ts: number;
-        if (typeof row.timestamp === "bigint") {
-          ts = Number(row.timestamp);
-        } else if (typeof row.timestamp === "string") {
-          ts = parseInt(row.timestamp, 10);
-        } else {
-          ts = Number(row.timestamp);
-        }
+    // Format value based on column name and type
+    const formatValue = (value: any, columnName: string): string => {
+      if (value == null) return "N/A";
 
-        // Only format if it's a valid positive timestamp
-        if (!isNaN(ts) && ts > 0 && ts < Number.MAX_SAFE_INTEGER) {
-          timestamp = new Date(ts).toLocaleString();
+      // Handle timestamps (BIGINT)
+      if (
+        columnName.includes("timestamp") ||
+        columnName === "start" ||
+        columnName === "request_timestamp" ||
+        columnName === "response_timestamp"
+      ) {
+        let ts: number;
+        if (typeof value === "bigint") {
+          ts = Number(value);
+        } else if (typeof value === "string") {
+          ts = parseInt(value, 10);
+        } else {
+          ts = Number(value);
         }
+        if (!isNaN(ts) && ts > 0 && ts < Number.MAX_SAFE_INTEGER) {
+          return new Date(ts).toLocaleString();
+        }
+        return "N/A";
       }
 
-      // Parse ad_unit_request_sizes if it's a JSON string
-      var requestSizes = "N/A";
-      if (row.ad_unit_request_sizes) {
+      // Handle JSON strings (arrays stored as JSON)
+      if (
+        columnName.includes("sizes") ||
+        columnName.includes("media_types") ||
+        columnName.includes("response_size")
+      ) {
         try {
-          const sizes = JSON.parse(row.ad_unit_request_sizes);
-          requestSizes = Array.isArray(sizes)
-            ? sizes
+          const parsed = JSON.parse(value);
+          const formatted = Array.isArray(parsed)
+            ? parsed
                 .map((s: any) => (Array.isArray(s) ? `[${s.join(",")}]` : s))
                 .join(", ")
-            : String(sizes);
-          if (requestSizes.length > 13) {
-            requestSizes = requestSizes.substring(0, 13) + "...";
-          }
+            : String(parsed);
+          return formatted.length > 20
+            ? formatted.substring(0, 20) + "..."
+            : formatted;
         } catch (e) {
-          requestSizes = row.ad_unit_request_sizes?.substring(0, 13) || "N/A";
+          return value.length > 20 ? value.substring(0, 20) + "..." : value;
         }
       }
 
-      // Truncate user agent
-      var userAgent = row.user_agent || "N/A";
-      if (userAgent.length > 18) {
-        userAgent = userAgent.substring(0, 18) + "...";
+      // Handle CPM (float)
+      if (columnName === "cpm") {
+        return Number(value).toFixed(4);
       }
 
-      recordsTable.push([
-        row.event_type || "N/A",
-        row.request_id?.substring(0, 16) + "..." || "N/A",
-        row.session_id?.substring(0, 16) + "..." || "N/A",
-        row.page_view_id?.substring(0, 16) + "..." || "N/A",
-        row.bidder_code || "N/A",
-        row.ad_unit_code || "N/A",
-        row.ad_unit_format || "N/A",
-        requestSizes,
-        userAgent,
-        row.domain || "N/A",
-        row.pbjs_timeout || "N/A",
-        row.bidder_request_id?.substring(0, 16) + "..." || "N/A",
-        row.latency_ms?.toFixed(2) || "N/A",
-        row.bidder_response_time?.toFixed(2) || "N/A",
-        timestamp,
-      ]);
+      // Handle time_to_respond (integer)
+      if (columnName === "time_to_respond") {
+        return `${value}ms`;
+      }
+
+      // Handle long text fields (truncate IDs)
+      if (
+        columnName.includes("id") &&
+        typeof value === "string" &&
+        value.length > 16
+      ) {
+        return value.substring(0, 16) + "...";
+      }
+
+      // Default: convert to string
+      return String(value);
+    };
+
+    rows.forEach((row: any) => {
+      const values = columnNames.map((colName: string) =>
+        formatValue(row[colName], colName)
+      );
+      recordsTable.push(values);
     });
 
     console.log(recordsTable.toString());
@@ -136,8 +137,10 @@ async function viewData() {
         bidder_code,
         event_type,
         COUNT(*) as event_count,
-        AVG(latency_ms) as avg_latency_ms,
-        AVG(bidder_response_time) as avg_response_time
+        COUNT(DISTINCT auction_id) as unique_auctions,
+        COUNT(DISTINCT session_id) as unique_sessions,
+        AVG(cpm) as avg_cpm,
+        AVG(time_to_respond) as avg_time_to_respond
       FROM bid_events
       GROUP BY bidder_code, event_type
       ORDER BY bidder_code, event_type
@@ -149,10 +152,12 @@ async function viewData() {
         "Bidder",
         "Event Type",
         "Count",
-        "Avg Latency (ms)",
-        "Avg Response Time (ms)",
+        "Unique Auctions",
+        "Unique Sessions",
+        "Avg CPM",
+        "Avg Time (ms)",
       ],
-      colWidths: [12, 14, 8, 16, 18],
+      colWidths: [12, 14, 8, 16, 16, 10, 12],
     });
 
     summaryRows.forEach((row: any) => {
@@ -160,8 +165,12 @@ async function viewData() {
         row.bidder_code || "N/A",
         row.event_type || "N/A",
         row.event_count || 0,
-        row.avg_latency_ms?.toFixed(2) || "N/A",
-        row.avg_response_time?.toFixed(2) || "N/A",
+        row.unique_auctions || 0,
+        row.unique_sessions || 0,
+        row.avg_cpm != null ? Number(row.avg_cpm).toFixed(4) : "N/A",
+        row.avg_time_to_respond != null
+          ? Number(row.avg_time_to_respond).toFixed(0)
+          : "N/A",
       ]);
     });
 

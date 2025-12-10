@@ -6,9 +6,13 @@ package-lock.json
 *.db
 *.duckdb
 *.duckdb.wal
+*.wal
 server/db/data.db
 analysis/*.duckdb
 analysis/[customer]-data.duckdb
+
+# Bun lock file
+bun.lockb
 
 # Raw data files
 analysis/raw_data/

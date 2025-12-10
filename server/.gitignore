@@ -178,4 +178,8 @@ dist
 *.db
 *.duckdb
 *.duckdb.wal
+*.wal
 db/data.db
+
+# Bun lock file
+bun.lockb
