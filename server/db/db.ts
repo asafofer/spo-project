@@ -3,6 +3,32 @@ import { DuckDBInstance } from "@duckdb/node-api";
 
 const DB_PATH = "./db/data.db";
 
+interface BidEvent {
+  eventType: string;
+  bidderCode: string;
+  adUnitCode: string;
+  auctionId: string;
+  bidId?: string;
+  bidderRequestId?: string;
+  requestId?: string;
+  requestSizes?: string[];
+  responseSize?: string;
+  requestMediaTypes?: string[];
+  responseMediaType?: string;
+  auctionStart?: number;
+  pbjsTimeout?: number;
+  sessionId: string;
+  pageviewId: string;
+  eventTimestamp: number;
+  requestTimestamp?: number;
+  responseTimestamp?: number;
+  timeToRespond?: number;
+  cpm?: number;
+  currency?: string;
+  domain: string;
+  auctionStatus?: number;
+}
+
 let db: DuckDBInstance | null = null;
 let conn: any = null;
 
@@ -21,14 +47,15 @@ export async function initDatabase(): Promise<void> {
         bid_id TEXT,
         bidder_request_id TEXT,
         request_id TEXT,
-        ad_unit_request_sizes TEXT,
-        ad_unit_response_size TEXT,
-        media_types TEXT,
-        start BIGINT,
+        request_sizes TEXT[],
+        response_size TEXT,
+        request_media_types TEXT[],
+        response_media_type TEXT,
+        auction_start BIGINT,
         pbjs_timeout INTEGER,
         session_id TEXT,
         pageview_id TEXT,
-        timestamp BIGINT,
+        event_timestamp BIGINT,
         request_timestamp BIGINT,
         response_timestamp BIGINT,
         time_to_respond INTEGER,
@@ -47,27 +74,31 @@ export async function initDatabase(): Promise<void> {
 }
 
 // Save formatted event data from collector - pure insertion, no calculations
-export async function saveFormattedEvent(event: any): Promise<void> {
+export async function saveFormattedEvent(event: BidEvent): Promise<void> {
   if (!conn) {
     throw new Error("Database connection not initialized");
   }
 
-  const adUnitRequestSizesStr = event.adUnitRequestSizes
-    ? JSON.stringify(event.adUnitRequestSizes)
+  const requestSizesArr = event.requestSizes
+    ? JSON.stringify(event.requestSizes)
     : null;
 
-  const adUnitResponseSizeStr = event.adUnitResponseSize
-    ? JSON.stringify(event.adUnitResponseSize)
+  const responseSizeStr = event.responseSize
+    ? JSON.stringify(event.responseSize)
     : null;
 
-  const mediaTypesStr = event.mediaTypes
-    ? JSON.stringify(event.mediaTypes)
+  const requestMediaTypesArr = event.requestMediaTypes
+    ? JSON.stringify(event.requestMediaTypes)
+    : null;
+
+  const responseMediaTypeStr = event.responseMediaType
+    ? JSON.stringify(event.responseMediaType)
     : null;
 
   // Convert timestamps to numbers (handle string, bigint, number)
-  const startValue = event.start != null ? Number(event.start) : null;
-  const timestampValue =
-    event.timestamp != null ? Number(event.timestamp) : null;
+  const auctionStart = event.auctionStart != null ? Number(event.auctionStart) : null;
+  const eventTimestamp =
+    event.eventTimestamp != null ? Number(event.eventTimestamp) : null;
   const requestTimestampValue =
     event.requestTimestamp != null ? Number(event.requestTimestamp) : null;
   const responseTimestampValue =
@@ -75,11 +106,30 @@ export async function saveFormattedEvent(event: any): Promise<void> {
 
   await conn.run(
     `INSERT INTO bid_events (
-      event_type, bidder_code, ad_unit_code, auction_id, bid_id,
-      bidder_request_id, request_id, ad_unit_request_sizes, ad_unit_response_size, media_types, start,
-      pbjs_timeout, session_id, pageview_id, timestamp, request_timestamp, response_timestamp,
-      time_to_respond, cpm, currency, domain, auction_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS BIGINT), ?, ?, ?, CAST(? AS BIGINT), CAST(? AS BIGINT), CAST(? AS BIGINT), ?, ?, ?, ?, ?)`,
+      event_type,
+      bidder_code,
+      ad_unit_code,
+      auction_id,
+      bid_id,
+      bidder_request_id,
+      request_id,
+      request_sizes,
+      response_size,
+      request_media_types,
+      response_media_type,
+      auction_start,
+      pbjs_timeout,
+      session_id,
+      pageview_id,
+      event_timestamp,
+      request_timestamp,
+      response_timestamp,
+      time_to_respond,
+      cpm,
+      currency,
+      domain,
+      auction_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS BIGINT), ?, ?, ?, CAST(? AS BIGINT), CAST(? AS BIGINT), CAST(? AS BIGINT), ?, ?, ?, ?, ?, ?)`,
     [
       event.eventType || null,
       event.bidderCode || null,
@@ -88,14 +138,15 @@ export async function saveFormattedEvent(event: any): Promise<void> {
       event.bidId || null,
       event.bidderRequestId || null,
       event.requestId || null,
-      adUnitRequestSizesStr,
-      adUnitResponseSizeStr,
-      mediaTypesStr,
-      startValue != null ? String(startValue) : null,
+      requestSizesArr,
+      responseSizeStr,
+      requestMediaTypesArr,
+      responseMediaTypeStr,
+      auctionStart != null ? String(auctionStart) : null,
       event.pbjsTimeout || null,
       event.sessionId || null,
       event.pageviewId || null,
-      timestampValue != null ? String(timestampValue) : null,
+      eventTimestamp != null ? String(eventTimestamp) : null,
       requestTimestampValue != null ? String(requestTimestampValue) : null,
       responseTimestampValue != null ? String(responseTimestampValue) : null,
       event.timeToRespond || null,

@@ -19,7 +19,7 @@ function getCommonData() {
   return {
     sessionId,
     pageviewId,
-    timestamp: Date.now(),
+    eventTimestamp: Date.now(),
     domain: window.location.hostname,
   };
 }
@@ -44,8 +44,7 @@ function queueEvents(events) {
 
   const enrichedEvents = events.map(event => ({
     ...event,
-    ...getCommonData(),
-    timestamp: event.timestamp || Date.now() 
+    ...getCommonData()
   }));
 
   requestQueue.push(...enrichedEvents);
