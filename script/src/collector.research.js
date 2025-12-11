@@ -34,8 +34,7 @@ function getBidData(bid, eventType) {
     requestId: bid.requestId,
     bidId: bid.bidId,
     bidderRequestId: bid.bidderRequestId,
-    adUnitRequestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined,
-    adUnitResponseSize: bid.size ? [bid.size] : ([bid.width, bid.hight].join('x'))
+    adUnitRequestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined  
   };
 }
 
@@ -97,7 +96,7 @@ function handleBidRequested(data) {
   const events = (data.bids || []).map((bid) => ({
     ...getBidData(bid, "bidRequested"),
     auctionId: bid.auctionId || data.auctionId, // Fallback to parent auctionId
-    mediaTypes: Object.keys(bid.mediaTypes || {}),
+    requestMediaTypes: Object.keys(bid.mediaTypes || {}),
     auctionStart: data.auctionStart,
     pbjsTimeout: data.timeout
   }));
@@ -115,9 +114,10 @@ function handleBidTimeout(bids) {
 function handleBidResponse(eventType, bid) {
   const event = {
     ...getBidData(bid, eventType),
+    responseSize: bid.size ? [bid.size] : ([bid.width, bid.hight].join('x')),
     rejectionReason: bid.rejectionReason,
     auctionStatus: eventType === "bidWon" ? 1 : 0,
-    mediaType: bid.mediaType,
+    responseMediaType: bid.mediaType,
     requestTimestamp: bid.requestTimestamp,
     responseTimestamp: bid.responseTimestamp,
     timeToRespond: bid.timeToRespond,
