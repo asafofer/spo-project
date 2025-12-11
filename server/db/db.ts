@@ -96,7 +96,8 @@ export async function saveFormattedEvent(event: BidEvent): Promise<void> {
     : null;
 
   // Convert timestamps to numbers (handle string, bigint, number)
-  const auctionStart = event.auctionStart != null ? Number(event.auctionStart) : null;
+  const auctionStart =
+    event.auctionStart != null ? Number(event.auctionStart) : null;
   const eventTimestamp =
     event.eventTimestamp != null ? Number(event.eventTimestamp) : null;
   const requestTimestampValue =
@@ -129,7 +130,7 @@ export async function saveFormattedEvent(event: BidEvent): Promise<void> {
       currency,
       domain,
       auction_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS BIGINT), ?, ?, ?, CAST(? AS BIGINT), CAST(? AS BIGINT), CAST(? AS BIGINT), ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       event.eventType || null,
       event.bidderCode || null,
@@ -142,13 +143,13 @@ export async function saveFormattedEvent(event: BidEvent): Promise<void> {
       responseSizeStr,
       requestMediaTypesArr,
       responseMediaTypeStr,
-      auctionStart != null ? String(auctionStart) : null,
+      auctionStart,
       event.pbjsTimeout || null,
       event.sessionId || null,
       event.pageviewId || null,
-      eventTimestamp != null ? String(eventTimestamp) : null,
-      requestTimestampValue != null ? String(requestTimestampValue) : null,
-      responseTimestampValue != null ? String(responseTimestampValue) : null,
+      eventTimestamp,
+      requestTimestampValue,
+      responseTimestampValue,
       event.timeToRespond || null,
       event.cpm || null,
       event.currency || null,
