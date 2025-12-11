@@ -35,7 +35,7 @@ function getBidData(bid, eventType) {
     bidId: bid.bidId,
     bidderRequestId: bid.bidderRequestId,
     adUnitRequestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined,
-    adUnitResponseSize: bid.size ? [bid.size] : undefined
+    adUnitResponseSize: bid.size ? [bid.size] : ([bid.width, bid.hight].join('x'))
   };
 }
 
@@ -98,7 +98,7 @@ function handleBidRequested(data) {
     ...getBidData(bid, "bidRequested"),
     auctionId: bid.auctionId || data.auctionId, // Fallback to parent auctionId
     mediaTypes: Object.keys(bid.mediaTypes || {}),
-    start: data.auctionStart,
+    auctionStart: data.auctionStart,
     pbjsTimeout: data.timeout
   }));
   queueEvents(events);
@@ -117,6 +117,7 @@ function handleBidResponse(eventType, bid) {
     ...getBidData(bid, eventType),
     rejectionReason: bid.rejectionReason,
     auctionStatus: eventType === "bidWon" ? 1 : 0,
+    mediaType: bid.mediaType,
     requestTimestamp: bid.requestTimestamp,
     responseTimestamp: bid.responseTimestamp,
     timeToRespond: bid.timeToRespond,
