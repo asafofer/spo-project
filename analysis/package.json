@@ -1,0 +1,18 @@
+{
+  "name": "analysis",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "fetch-latest-events": "bun run queries/fetch-latest-events.ts",
+    "count-by-country": "bun run queries/count-by-country.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@axiomhq/js": "^1.3.1"
+  }
+}
