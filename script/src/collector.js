@@ -1,12 +1,16 @@
 import { addEvents, flush, markAuctionCompleted } from "./eventSender.js";
 import { logger } from "./logger.js";
 
-// Initialize Prebid queue if not present
-window.pbjs = window.pbjs || {};
-pbjs.que = pbjs.que || [];
+/**
+ * Check if we're in a browser environment
+ * @returns {boolean}
+ */
+function isBrowser() {
+  return typeof window !== "undefined";
+}
 
 // Normalize bid fields across different event types
-function getBidData(bid, eventType) {
+export function getBidData(bid, eventType) {
   return {
     eventType: eventType,
     bidderCode: bid.bidder || bid.bidderCode,
@@ -29,7 +33,7 @@ function queueEvents(events) {
 
 // --- Event Handlers ---
 
-function handleBidRequested(data) {
+export function handleBidRequested(data) {
   const events = (data.bids || []).map((bid) => ({
     ...getBidData(bid, "bidRequested"),
     auctionId: bid.auctionId || data.auctionId, // Fallback to parent auctionId
@@ -48,7 +52,7 @@ function handleBidTimeout(bids) {
   queueEvents(events);
 }
 
-function handleBidResponse(eventType, bid) {
+export function handleBidResponse(eventType, bid) {
   const event = {
     ...getBidData(bid, eventType),
     responseSize: bid.size ? [bid.size] : [bid.width, bid.height].join("x"),
@@ -134,21 +138,36 @@ function registerLiveListeners(pbjsInstance) {
   });
 }
 
-// --- Subscription ---
+/**
+ * Initialize collector in browser environment
+ */
+function initCollector() {
+  if (!isBrowser()) return;
 
-pbjs.que.push(() => {
-  // Process past events first
-  handlePastEvents(pbjs);
+  // Initialize Prebid queue if not present
+  window.pbjs = window.pbjs || {};
+  window.pbjs.que = window.pbjs.que || [];
+  const pbjs = window.pbjs;
 
-  // Listen to all tracking events going forward
-  registerLiveListeners(pbjs);
+  // Subscribe to Prebid events
+  pbjs.que.push(() => {
+    // Process past events first
+    handlePastEvents(window.pbjs);
 
-  logger.log("[Collector] Initialized");
-});
+    // Listen to all tracking events going forward
+    registerLiveListeners(window.pbjs);
 
-// Flush buffer on session end (tab close/hidden)
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") {
-    flush();
+    logger.log("[Collector] Initialized");
+  });
+
+  // Flush buffer on session end (tab close/hidden)
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    });
   }
-});
+}
+
+initCollector();

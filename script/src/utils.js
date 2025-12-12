@@ -10,11 +10,27 @@ export function generateUUID() {
 }
 
 /**
+ * Check if we're in a browser environment
+ * @returns {boolean}
+ */
+function isBrowser() {
+  return typeof sessionStorage !== "undefined";
+}
+
+/**
  * Get or create session ID from sessionStorage
  * Session persists across page reloads but not across browser sessions
  * @returns {string} Session ID
  */
 export function getSessionId() {
+  if (!isBrowser()) {
+    // Return cached ID or generate a new one for this process
+    if (!cachedSessionId) {
+      cachedSessionId = generateUUID();
+    }
+    return cachedSessionId;
+  }
+
   try {
     let sessionId = sessionStorage.getItem(sessionKey);
     if (!sessionId) {

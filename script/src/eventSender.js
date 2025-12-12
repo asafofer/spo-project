@@ -13,7 +13,17 @@ const VERSION = "__VERSION__"; // Will be replaced at build time from package.js
 // Initialize common data (static per page load)
 const pageviewId = generateUUID();
 const sessionId = getSessionId();
-const uaInfo = parseUserAgent(navigator.userAgent);
+let userAgent = "";
+let uaInfo;
+
+function initEventSender() {
+  if (typeof navigator !== "undefined") {
+    userAgent = navigator.userAgent;
+  }
+  uaInfo = parseUserAgent(userAgent);
+}
+
+initEventSender();
 
 // IP cache - fetched once per page load
 let cachedIP = null;
@@ -64,12 +74,19 @@ async function fetchIP() {
 }
 
 /**
+ * Check if we're in a browser environment
+ * @returns {boolean}
+ */
+function isBrowser() {
+  return typeof window !== "undefined";
+}
+
+/**
  * Get common metadata for events (includes IP if available, or yotoCountry if yotoApp.country exists)
  * @returns {Promise<Object>} Common data object
  */
 async function getCommonData() {
-  // Check if yotoApp.country exists - if so, use it instead of fetching IP
-  const yotoCountry = window.yotoApp?.country;
+  const yotoCountry = isBrowser() ? window.yotoApp?.country : undefined;
   const eventTimestamp = Date.now();
   let ip = null;
   if (!yotoCountry) {
@@ -81,10 +98,10 @@ async function getCommonData() {
     sessionId,
     pageviewId,
     eventTimestamp: eventTimestamp,
-    domain: window.location.hostname,
+    domain: isBrowser() && window.location ? window.location.hostname : "",
     os: uaInfo.operatingSystem,
     browser: uaInfo.browser,
-    ua: navigator.userAgent,
+    ua: userAgent,
     ip: ip,
     yotoCountry: yotoCountry || null,
     version: VERSION,
@@ -150,7 +167,7 @@ export async function flush() {
   if (eventQueue.length === 0) return;
 
   // Check if we need to fetch IP (only if yotoApp.country doesn't exist)
-  const yotoCountry = window.yotoApp?.country;
+  const yotoCountry = isBrowser() ? window.yotoApp?.country : undefined;
   if (!yotoCountry) {
     // Wait for IP to be fetched (or timeout) only if yotoApp.country is not available
     await fetchIP();

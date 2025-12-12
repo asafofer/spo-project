@@ -12,11 +12,13 @@
     "version:major": "bun run version.ts major",
     "version": "bun run version.ts",
     "lint": "biome check .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "test": "bun test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "happy-dom": "^15.0.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
