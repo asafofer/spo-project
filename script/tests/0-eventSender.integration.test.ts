@@ -1,16 +1,31 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
-import { addEvents, flush, markAuctionCompleted, resetEventSender } from "../src/eventSender.js";
 import type { AnalyticsEventData } from "../src/types/analyticsEvent.js";
+
+// CRITICAL: Restore the real eventSender module at the top level BEFORE any tests run
+// Other test files mock this module, and those mocks persist. We need to explicitly
+// restore it to use the real implementation for integration tests.
+const realEventSenderModule = await import("../src/eventSender.js");
+mock.module("../src/eventSender.js", () => realEventSenderModule);
 
 describe("EventSender Integration Tests", () => {
   let happyWindow: Window;
   let fetchSpy: ReturnType<typeof mock>;
   let originalFetch: typeof globalThis.fetch;
+  let eventSender: typeof import("../src/eventSender.js");
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // CRITICAL: Dynamically import the real module in beforeEach to bypass module mocks
+    // Other test files mock this module at the top level, and those mocks persist.
+    // By using dynamic imports here, we ensure we get the real implementation.
+    eventSender = await import("../src/eventSender.js");
+
+    // Restore the module mock to use the real implementation
+    // This must happen in beforeEach to override mocks from other test files
+    mock.module("../src/eventSender.js", () => realEventSenderModule);
+
     // Reset eventSender state
-    resetEventSender();
+    eventSender.resetEventSender();
 
     // Fresh environment for every test
     happyWindow = new Window();
@@ -28,14 +43,15 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       if (urlString.includes("cloudflare.com")) {
         // IP endpoint
         return Promise.resolve({
           ok: true,
           status: 200,
-          text: () => Promise.resolve("fl=123\nh=example.com\nip=192.168.1.1\n"),
+          text: () =>
+            Promise.resolve("fl=123\nh=example.com\nip=192.168.1.1\n"),
         } as Response);
       }
       // Events endpoint
@@ -48,7 +64,7 @@ describe("EventSender Integration Tests", () => {
 
     // Replace global fetch with our mock - this must happen before flush() is called
     (globalThis as any).fetch = fetchSpy;
-    
+
     // Clear any previous mock calls
     fetchSpy.mockClear();
   });
@@ -63,13 +79,13 @@ describe("EventSender Integration Tests", () => {
       },
     ];
 
-    addEvents(events);
+    eventSender.addEvents(events);
 
     // Set up window location
     const win = happyWindow.window as any;
     win.location = { hostname: "example.com" };
 
-    await flush();
+    await eventSender.flush();
 
     // Wait for async fetch to complete (sendPayload calls fetch asynchronously)
     // sendPayload is fire-and-forget, so we need to wait for the fetch promise to start
@@ -90,8 +106,8 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       return urlString.includes("axiom.co");
     });
     expect(eventCall).toBeDefined();
@@ -121,12 +137,12 @@ describe("EventSender Integration Tests", () => {
       },
     ];
 
-    addEvents(events);
+    eventSender.addEvents(events);
 
     const win = happyWindow.window as any;
     win.location = { hostname: "example.com" };
 
-    await flush();
+    await eventSender.flush();
 
     // Wait for async fetch to complete (sendPayload calls fetch asynchronously)
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -138,15 +154,15 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       return urlString.includes("axiom.co");
     });
     const firstFlushCallCount = eventCallsAfterFirst.length;
 
     // Second flush should not send anything (queue is empty)
     // This verifies that flush() cleared the queue (proves sendPayload was called)
-    await flush();
+    await eventSender.flush();
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Should not make additional event endpoint calls
@@ -156,8 +172,8 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       return urlString.includes("axiom.co");
     });
     expect(eventCallsAfterSecond.length).toBe(firstFlushCallCount);
@@ -171,8 +187,8 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       if (urlString.includes("cloudflare.com")) {
         return Promise.reject(new Error("Network error"));
       }
@@ -192,13 +208,13 @@ describe("EventSender Integration Tests", () => {
       },
     ];
 
-    addEvents(events);
+    eventSender.addEvents(events);
 
     const win = happyWindow.window as any;
     win.location = { hostname: "example.com" };
 
     // Should not throw even if IP fetch fails
-    await flush();
+    await eventSender.flush();
     expect(true).toBe(true); // If we get here, no error was thrown
   });
 
@@ -215,9 +231,9 @@ describe("EventSender Integration Tests", () => {
       },
     ];
 
-    addEvents(events);
+    eventSender.addEvents(events);
 
-    await flush();
+    await eventSender.flush();
 
     // Wait for async fetch to complete (sendPayload calls fetch asynchronously)
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -229,8 +245,8 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       return urlString.includes("cloudflare.com");
     });
     expect(ipCalls.length).toBe(0);
@@ -242,8 +258,8 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       return urlString.includes("axiom.co");
     });
     expect(eventCalls.length).toBeGreaterThan(0);
@@ -268,13 +284,13 @@ describe("EventSender Integration Tests", () => {
       },
     ];
 
-    addEvents(events);
-    markAuctionCompleted("auc-123");
+    eventSender.addEvents(events);
+    eventSender.markAuctionCompleted("auc-123");
 
     const win = happyWindow.window as any;
     win.location = { hostname: "example.com" };
 
-    await flush();
+    await eventSender.flush();
 
     // Wait for async fetch to complete (sendPayload calls fetch asynchronously)
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -286,20 +302,21 @@ describe("EventSender Integration Tests", () => {
         typeof url === "string"
           ? url
           : url instanceof URL
-            ? url.toString()
-            : (url as Request)?.url || String(url);
+          ? url.toString()
+          : (url as Request)?.url || String(url);
       return urlString.includes("axiom.co");
     });
     expect(eventCalls.length).toBeGreaterThan(0);
 
-    if (eventCalls.length > 0) {
-      const body = JSON.parse(eventCalls[0][1]?.body || "[]");
-      const auc123Events = body.filter(
-        (e: any) => e.auctionId === "auc-123"
-      );
-      auc123Events.forEach((event: any) => {
-        expect(event.auctionStatus).toBe(1);
-      });
+    if (eventCalls.length > 0 && eventCalls[0]) {
+      const callOptions = eventCalls[0][1];
+      if (callOptions) {
+        const body = JSON.parse(callOptions.body || "[]");
+        const auc123Events = body.filter((e: any) => e.auctionId === "auc-123");
+        auc123Events.forEach((event: any) => {
+          expect(event.auctionStatus).toBe(1);
+        });
+      }
     }
   });
 
@@ -312,14 +329,14 @@ describe("EventSender Integration Tests", () => {
       },
     ];
 
-    addEvents(events);
+    eventSender.addEvents(events);
 
     // Remove window
     const originalWindow = (globalThis as any).window;
     delete (globalThis as any).window;
 
     // Should not throw
-    await flush();
+    await eventSender.flush();
     expect(true).toBe(true); // If we get here, no error was thrown
 
     // Restore window
@@ -329,10 +346,9 @@ describe("EventSender Integration Tests", () => {
   test("flush does nothing when queue is empty", async () => {
     const callCountBefore = fetchSpy.mock.calls.length;
 
-    await flush();
+    await eventSender.flush();
 
     // Should not make any fetch calls
     expect(fetchSpy.mock.calls.length).toBe(callCountBefore);
   });
 });
-
