@@ -10,9 +10,12 @@
     "version:patch": "bun run version.ts patch",
     "version:minor": "bun run version.ts minor",
     "version:major": "bun run version.ts major",
-    "version": "bun run version.ts"
+    "version": "bun run version.ts",
+    "lint": "biome check .",
+    "format": "biome check --write ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
     "@types/bun": "latest"
   },
   "peerDependencies": {

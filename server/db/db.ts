@@ -180,7 +180,7 @@ export async function saveFormattedEvent(event: BidEvent): Promise<void> {
       event.currency || null,
       event.domain || null,
       event.auctionStatus || null,
-    ]
+    ],
   );
 }
 
@@ -209,7 +209,7 @@ export async function getData(limit: number = 100): Promise<any[]> {
   }
 
   const result = await conn.runAndReadAll(
-    `SELECT * FROM bid_events ORDER BY event_timestamp DESC LIMIT ${limit}`
+    `SELECT * FROM bid_events ORDER BY event_timestamp DESC LIMIT ${limit}`,
   );
   return result.getRowObjectsJS();
 }
@@ -239,7 +239,7 @@ export async function getCount(): Promise<number> {
   }
 
   const result = await conn.runAndReadAll(
-    "SELECT COUNT(*) as total FROM bid_events"
+    "SELECT COUNT(*) as total FROM bid_events",
   );
   const rows = result.getRowObjectsJS();
   return rows[0]?.total || 0;

@@ -38,7 +38,7 @@ const server = Bun.serve({
         events.forEach((event: PrebidEvent, index: number) => {
           console.log(
             `[Server Event ${index + 1}] ${event.eventType}:`,
-            JSON.stringify(event, null, 2)
+            JSON.stringify(event, null, 2),
           );
         });
 
@@ -88,7 +88,7 @@ const server = Bun.serve({
 initDatabase()
   .then(() => {
     console.log(
-      `[Server] Mock endpoint listening on http://localhost:${PORT}/events`
+      `[Server] Mock endpoint listening on http://localhost:${PORT}/events`,
     );
   })
   .catch((error) => {

@@ -1,6 +1,6 @@
 // Version bumping script using semver
-import { readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 const PACKAGE_JSON_PATH = join(import.meta.dir, "package.json");
 
@@ -15,7 +15,11 @@ function parseVersion(version: string): [number, number, number] {
 /**
  * Format version array into string
  */
-function formatVersion([major, minor, patch]: [number, number, number]): string {
+function formatVersion([major, minor, patch]: [
+  number,
+  number,
+  number,
+]): string {
   return `${major}.${minor}.${patch}`;
 }
 
@@ -24,7 +28,7 @@ function formatVersion([major, minor, patch]: [number, number, number]): string 
  */
 function bumpVersion(
   current: string,
-  type: "major" | "minor" | "patch"
+  type: "major" | "minor" | "patch",
 ): string {
   const [major, minor, patch] = parseVersion(current);
 
@@ -62,7 +66,7 @@ async function main() {
     await writeFile(
       PACKAGE_JSON_PATH,
       JSON.stringify(packageJson, null, 2) + "\n",
-      "utf-8"
+      "utf-8",
     );
 
     console.log(`Version bumped: ${currentVersion} → ${newVersion} (${type})`);
@@ -73,4 +77,3 @@ async function main() {
 }
 
 main();
-

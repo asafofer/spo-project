@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "module": "index.ts",
   "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
     "@types/bun": "latest"
   },
   "peerDependencies": {
@@ -14,7 +15,9 @@
     "dev": "bun run index.ts",
     "view-data": "bun run scripts/view-data.ts",
     "delete-data": "bun run scripts/delete-data.ts",
-    "drop-table": "bun run scripts/drop-table.ts"
+    "drop-table": "bun run scripts/drop-table.ts",
+    "lint": "biome check .",
+    "format": "biome check --write ."
   },
   "type": "module",
   "dependencies": {

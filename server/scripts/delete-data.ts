@@ -33,7 +33,7 @@ async function deleteData() {
 
     // Get count before deletion
     const countResult = await conn.runAndReadAll(
-      "SELECT COUNT(*) as total FROM bid_events"
+      "SELECT COUNT(*) as total FROM bid_events",
     );
     const count = countResult.getRowObjectsJS();
     const totalRecords = count[0]?.total || 0;
@@ -50,7 +50,7 @@ async function deleteData() {
 
     // Ask for confirmation
     const confirmed = await askConfirmation(
-      "Are you sure you want to delete ALL data? (yes/no): "
+      "Are you sure you want to delete ALL data? (yes/no): ",
     );
 
     if (!confirmed) {
@@ -67,7 +67,7 @@ async function deleteData() {
 
     // Verify deletion
     const verifyResult = await conn.runAndReadAll(
-      "SELECT COUNT(*) as total FROM bid_events"
+      "SELECT COUNT(*) as total FROM bid_events",
     );
     const verifyCount = verifyResult.getRowObjectsJS();
     const remainingRecords = verifyCount[0]?.total || 0;
@@ -76,7 +76,7 @@ async function deleteData() {
       console.log(`\n✓ Successfully deleted ${totalRecords} record(s).`);
     } else {
       console.log(
-        `\n⚠ Warning: ${remainingRecords} record(s) still remain in database.`
+        `\n⚠ Warning: ${remainingRecords} record(s) still remain in database.`,
       );
     }
 
@@ -85,7 +85,7 @@ async function deleteData() {
   } catch (error: any) {
     if (error?.message?.includes("lock")) {
       console.error(
-        "Error: Database is locked. Please stop the server first, then run this script."
+        "Error: Database is locked. Please stop the server first, then run this script.",
       );
     } else {
       console.error("Error deleting data:", error);

@@ -34,7 +34,7 @@ async function dropTable() {
     // Check if table exists
     try {
       const checkResult = await conn.runAndReadAll(
-        "SELECT COUNT(*) as count FROM bid_events"
+        "SELECT COUNT(*) as count FROM bid_events",
       );
       const count = checkResult.getRowObjectsJS()[0]?.count || 0;
       console.log(`Table contains ${count} record(s).`);
@@ -49,7 +49,7 @@ async function dropTable() {
 
     // Ask for confirmation
     const confirmed = await askConfirmation(
-      "Are you sure you want to drop the bid_events table? (yes/no): "
+      "Are you sure you want to drop the bid_events table? (yes/no): ",
     );
 
     if (!confirmed) {
@@ -71,7 +71,7 @@ async function dropTable() {
   } catch (error: any) {
     if (error?.message?.includes("lock")) {
       console.error(
-        "Error: Database is locked. Please stop the server first, then run this script."
+        "Error: Database is locked. Please stop the server first, then run this script.",
       );
     } else {
       console.error("Error dropping table:", error);

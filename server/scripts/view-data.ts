@@ -13,14 +13,14 @@ async function viewData() {
 
     // Get total count
     const countResult = await conn.runAndReadAll(
-      "SELECT COUNT(*) as total FROM bid_events"
+      "SELECT COUNT(*) as total FROM bid_events",
     );
     const count = countResult.getRowObjectsJS();
     console.log(`Total records: ${count[0]?.total || 0}\n`);
 
     // Get all data
     const result = await conn.runAndReadAll(
-      "SELECT * FROM bid_events ORDER BY event_timestamp DESC LIMIT 100"
+      "SELECT * FROM bid_events ORDER BY event_timestamp DESC LIMIT 100",
     );
     const rows = result.getRowObjectsJS();
 
@@ -137,7 +137,7 @@ async function viewData() {
 
     rows.forEach((row: any) => {
       const values = columnNames.map((colName: string) =>
-        formatValue(row[colName], colName)
+        formatValue(row[colName], colName),
       );
       recordsTable.push(values);
     });
@@ -195,7 +195,7 @@ async function viewData() {
   } catch (error: any) {
     if (error?.message?.includes("lock")) {
       console.error(
-        "Error: Database is locked. Please stop the server first, then run this script."
+        "Error: Database is locked. Please stop the server first, then run this script.",
       );
     } else {
       console.error("Error viewing data:", error);

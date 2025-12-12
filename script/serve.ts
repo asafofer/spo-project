@@ -6,7 +6,7 @@ Bun.serve({
   port: PORT,
   fetch(req) {
     const url = new URL(req.url);
-    
+
     // Default to index.html if root is requested
     let path = url.pathname;
     if (path === "/") path = "/index.html";

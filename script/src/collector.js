@@ -1,5 +1,5 @@
-import { logger } from "./logger.js";
 import { addEvents, flush, markAuctionCompleted } from "./eventSender.js";
+import { logger } from "./logger.js";
 
 // Initialize Prebid queue if not present
 window.pbjs = window.pbjs || {};
@@ -15,7 +15,9 @@ function getBidData(bid, eventType) {
     requestId: bid.requestId,
     bidId: bid.bidId,
     bidderRequestId: bid.bidderRequestId,
-    requestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined  
+    requestSizes: bid.sizes
+      ? bid.sizes.map((sizeArray) => sizeArray.join("x"))
+      : undefined,
   };
 }
 
@@ -33,7 +35,7 @@ function handleBidRequested(data) {
     auctionId: bid.auctionId || data.auctionId, // Fallback to parent auctionId
     requestMediaTypes: Object.keys(bid.mediaTypes || {}),
     auctionStart: data.auctionStart,
-    pbjsTimeout: data.timeout
+    pbjsTimeout: data.timeout,
   }));
   queueEvents(events);
 }
@@ -41,7 +43,7 @@ function handleBidRequested(data) {
 function handleBidTimeout(bids) {
   const events = (bids || []).map((bid) => ({
     ...getBidData(bid, "bidTimeout"),
-    pbjsTimeout: bid.timeout
+    pbjsTimeout: bid.timeout,
   }));
   queueEvents(events);
 }
@@ -49,7 +51,7 @@ function handleBidTimeout(bids) {
 function handleBidResponse(eventType, bid) {
   const event = {
     ...getBidData(bid, eventType),
-    responseSize: bid.size ? [bid.size] : ([bid.width, bid.height].join('x')),
+    responseSize: bid.size ? [bid.size] : [bid.width, bid.height].join("x"),
     rejectionReason: bid.rejectionReason,
     auctionStatus: eventType === "bidWon" ? 1 : 0,
     responseMediaType: bid.mediaType,
@@ -57,7 +59,7 @@ function handleBidResponse(eventType, bid) {
     responseTimestamp: bid.responseTimestamp,
     timeToRespond: bid.timeToRespond,
     cpm: bid.cpm,
-    currency: bid.currency
+    currency: bid.currency,
   };
   queueEvents([event]);
 }
@@ -85,7 +87,7 @@ const trackingEvents = Object.keys(eventHandlers);
 
 // Handle past events that occurred before collector was loaded
 function handlePastEvents(pbjsInstance) {
-  if (typeof pbjsInstance.getEvents !== 'function') {
+  if (typeof pbjsInstance.getEvents !== "function") {
     return; // getEvents not available
   }
 
@@ -99,7 +101,7 @@ function handlePastEvents(pbjsInstance) {
 
     pastEvents.forEach((event) => {
       const eventType = event.eventType;
-      
+
       // Only process events in our tracking list
       if (!trackingEvents.includes(eventType)) {
         return;
@@ -120,7 +122,7 @@ function handlePastEvents(pbjsInstance) {
 
 // Register live listeners for tracking events
 function registerLiveListeners(pbjsInstance) {
-  trackingEvents.forEach(eventType => {
+  trackingEvents.forEach((eventType) => {
     pbjsInstance.onEvent(eventType, (data) => {
       const handler = eventHandlers[eventType];
       if (handler) {
@@ -137,10 +139,10 @@ function registerLiveListeners(pbjsInstance) {
 pbjs.que.push(() => {
   // Process past events first
   handlePastEvents(pbjs);
-  
+
   // Listen to all tracking events going forward
   registerLiveListeners(pbjs);
-  
+
   logger.log("[Collector] Initialized");
 });
 
@@ -150,4 +152,3 @@ document.addEventListener("visibilitychange", () => {
     flush();
   }
 });
-

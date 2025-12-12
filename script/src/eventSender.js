@@ -1,9 +1,11 @@
 // Event sender module - handles IP fetching, enrichment, buffering, and sending
-import { getSessionId, generateUUID } from "./utils.js";
+
 import { logger } from "./logger.js";
 import { parseUserAgent } from "./uaParser.js";
+import { generateUUID, getSessionId } from "./utils.js";
 
-const EVENTS_ENDPOINT_URL = "https://us-east-1.aws.edge.axiom.co/v1/ingest/prebid-events";
+const EVENTS_ENDPOINT_URL =
+  "https://us-east-1.aws.edge.axiom.co/v1/ingest/prebid-events";
 const IP_ENDPOINT_URL = "https://cloudflare.com/cdn-cgi/trace";
 const MAX_RETRIES = 3;
 const VERSION = "__VERSION__"; // Will be replaced at build time from package.json
@@ -171,4 +173,3 @@ export async function flush() {
   sendPayload(payload, 0);
   logger.log(`[EventSender] Flushed ${payload.length} event(s)`);
 }
-

@@ -1,9 +1,11 @@
 // Prebid Configuration
-var pbjs = pbjs || {};
-pbjs.que = pbjs.que || [];
+window.pbjs = window.pbjs || {};
+window.pbjs.que = window.pbjs.que || [];
+
+var pbjs = window.pbjs;
 
 // Configure Prebid with Ozone bidder (test parameters)
-pbjs.que.push(function () {
+pbjs.que.push(() => {
   var adUnits = [
     {
       code: "ad-container",
@@ -31,11 +33,11 @@ pbjs.que.push(function () {
 });
 
 // Request bids after Prebid is ready
-pbjs.que.push(function () {
+pbjs.que.push(() => {
   // Request bids
   pbjs.requestBids({
     timeout: 3000,
-    bidsBackHandler: function (bidResponses) {
+    bidsBackHandler: (_bidResponses) => {
       var adUnitCode = "ad-container";
       var bid = pbjs.getHighestCpmBids(adUnitCode)[0];
       if (bid) {
