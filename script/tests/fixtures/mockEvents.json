@@ -1,0 +1,39 @@
+{
+  "bidRequested": {
+    "auctionId": "auc-1234-5678",
+    "auctionStart": 1700000000000,
+    "timeout": 3000,
+    "bids": [
+      {
+        "bidder": "ozone",
+        "adUnitCode": "div-gpt-ad-1",
+        "bidId": "bid-111",
+        "bidderRequestId": "req-111",
+        "auctionId": "auc-1234-5678",
+        "sizes": [[300, 250], [300, 600]],
+        "mediaTypes": {
+          "banner": { "sizes": [[300, 250]] }
+        },
+        "params": { "placementId": "1234567890" }
+      }
+    ]
+  },
+  "bidResponse": {
+    "bidderCode": "ozone",
+    "width": 300,
+    "height": 250,
+    "statusMessage": "Bid available",
+    "adId": "bid-111",
+    "requestId": "bid-111",
+    "mediaType": "banner",
+    "source": "client",
+    "cpm": 1.25,
+    "currency": "USD",
+    "netRevenue": true,
+    "ttl": 300,
+    "creativeId": "c-123",
+    "timeToRespond": 120,
+    "responseTimestamp": 1700000000120,
+    "requestTimestamp": 1700000000000
+  }
+}
