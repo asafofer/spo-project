@@ -1,5 +1,5 @@
 import { Window } from "happy-dom";
-import type { Bid } from "../../src/types/bid.js";
+import type { Bid } from "../../src/types/prebidEvent.js";
 
 /**
  * Create a mock happy-dom window and set up global browser environment

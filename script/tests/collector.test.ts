@@ -1,20 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
 import { handleBidRequested, handleBidResponse } from "../src/collector.js";
-import type { Bid } from "../src/types/bid.js";
+import type { Bid, PastEvent } from "../src/types/prebidEvent.js";
 import mockEvents from "./data/mockEvents.json";
-
-type MockEvent = {
-  eventType: string;
-  args:
-    | Bid
-    | {
-        bids?: Bid[];
-        auctionId?: string;
-        auctionStart?: number;
-        timeout?: number;
-      };
-};
 
 // Mock dependencies
 const addEventsSpy = mock();
@@ -38,7 +26,7 @@ describe("Collector Integration (Real Data Replay)", () => {
 
   test("handleBidRequested -> correctly parses real bid request", () => {
     // 1. Find a suitable event from the fixture
-    const eventData = (mockEvents as MockEvent[]).find(
+    const eventData = (mockEvents as PastEvent[]).find(
       (e) => e.eventType === "bidRequested"
     );
 
@@ -67,7 +55,7 @@ describe("Collector Integration (Real Data Replay)", () => {
 
   test("handleBidResponse -> correctly parses real bid response", () => {
     // 1. Find a suitable event
-    const eventData = (mockEvents as MockEvent[]).find(
+    const eventData = (mockEvents as PastEvent[]).find(
       (e) => e.eventType === "bidResponse"
     );
 
@@ -92,7 +80,7 @@ describe("Collector Integration (Real Data Replay)", () => {
   });
 
   test("handleBidResponse -> bidRejected event type", () => {
-    const eventData = (mockEvents as MockEvent[]).find(
+    const eventData = (mockEvents as PastEvent[]).find(
       (e) => e.eventType === "bidResponse"
     );
 
@@ -113,7 +101,7 @@ describe("Collector Integration (Real Data Replay)", () => {
   });
 
   test("handleBidResponse -> bidWon event type", () => {
-    const eventData = (mockEvents as MockEvent[]).find(
+    const eventData = (mockEvents as PastEvent[]).find(
       (e) => e.eventType === "bidResponse"
     );
 
@@ -276,7 +264,7 @@ describe("Collector Integration (Real Data Replay)", () => {
   test("Smoke Test: Replay entire timeline without crashing", () => {
     let processedCount = 0;
 
-    (mockEvents as MockEvent[]).forEach((event) => {
+    (mockEvents as PastEvent[]).forEach((event) => {
       try {
         if (event.eventType === "bidRequested") {
           handleBidRequested(

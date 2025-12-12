@@ -4,12 +4,19 @@ import type {
   AnalyticsEventData,
   BaseAnalyticsEvent,
 } from "./types/analyticsEvent.js";
-import type { Bid } from "./types/bid.js";
-import type { PrebidEventType } from "./types/prebidEvent.js";
+import type {
+  Bid,
+  PastEvent,
+  PrebidEvent,
+  PrebidEventType,
+} from "./types/prebidEvent.js";
 
 type PbjsInstance = {
-  getEvents?: () => unknown[];
-  onEvent: (eventType: string, handler: (data: unknown) => void) => void;
+  getEvents?: () => PastEvent[];
+  onEvent: (
+    eventType: PrebidEventType,
+    handler: (data: PrebidEvent) => void
+  ) => void;
 };
 
 /**
@@ -105,19 +112,35 @@ function handleAuctionEnd(auctionProperties: { auctionId: string }): void {
 // --- Subscription helpers ---
 
 // Map event types to their handlers (keeps dispatch DRY)
-const eventHandlers: Record<string, (data: unknown) => void> = {
-  bidRequested: (data) =>
-    handleBidRequested(data as Parameters<typeof handleBidRequested>[0]),
-  bidTimeout: (data) => handleBidTimeout(data as Bid[]),
-  bidResponse: (data) => handleBidResponse("bidResponse", data as Bid),
-  bidRejected: (data) => handleBidResponse("bidRejected", data as Bid),
-  bidWon: (data) => handleBidResponse("bidWon", data as Bid),
-  auctionEnd: (data) =>
-    handleAuctionEnd(data as Parameters<typeof handleAuctionEnd>[0]),
+const eventHandlers: Record<string, (data: PrebidEvent) => void> = {
+  bidRequested: (data) => {
+    const event = data as Extract<PrebidEvent, { eventType?: "bidRequested" }>;
+    handleBidRequested(event);
+  },
+  bidTimeout: (data) => {
+    // Prebid sends Bid[] directly for bidTimeout
+    handleBidTimeout(data as Bid[]);
+  },
+  bidResponse: (data) => {
+    // Prebid sends Bid directly for bidResponse
+    handleBidResponse("bidResponse", data as Bid);
+  },
+  bidRejected: (data) => {
+    // Prebid sends Bid directly for bidRejected
+    handleBidResponse("bidRejected", data as Bid);
+  },
+  bidWon: (data) => {
+    // Prebid sends Bid directly for bidWon
+    handleBidResponse("bidWon", data as Bid);
+  },
+  auctionEnd: (data) => {
+    const event = data as Extract<PrebidEvent, { eventType?: "auctionEnd" }>;
+    handleAuctionEnd(event);
+  },
 };
 
 // Derive tracking events from handler keys
-const trackingEvents = Object.keys(eventHandlers);
+const trackingEvents = Object.keys(eventHandlers) as PrebidEventType[];
 
 // Handle past events that occurred before collector was loaded
 function handlePastEvents(pbjsInstance: PbjsInstance): void {
@@ -133,19 +156,24 @@ function handlePastEvents(pbjsInstance: PbjsInstance): void {
 
     logger.log(`[Collector] Processing ${pastEvents.length} past event(s)`);
 
-    pastEvents.forEach((event) => {
-      const evt = event as { eventType?: string };
-      const eventType = evt.eventType;
+    pastEvents.forEach((pastEvent: PastEvent) => {
+      const eventType = pastEvent.eventType;
 
       // Only process events in our tracking list
-      if (!eventType || !trackingEvents.includes(eventType)) {
+      if (
+        !eventType ||
+        !trackingEvents.includes(eventType as PrebidEventType)
+      ) {
         return;
       }
 
+      // Extract the actual payload from args (past events are wrapped)
+      const eventPayload = pastEvent.args;
+
       // Dispatch via handler map
-      const handler = eventHandlers[eventType];
+      const handler = eventHandlers[eventType as PrebidEventType];
       if (handler) {
-        handler(event);
+        handler(eventPayload);
       } else {
         logger.warn(`[Collector] Unknown past event type: ${eventType}`);
       }

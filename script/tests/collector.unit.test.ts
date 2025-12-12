@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { getBidData } from "../src/collector.js";
-import type { Bid } from "../src/types/bid.js";
+import type { Bid } from "../src/types/prebidEvent.js";
 
 describe("Collector Unit Tests - getBidData", () => {
   test("normalizes bid fields correctly", () => {

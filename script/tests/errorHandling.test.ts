@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
 import { handleBidRequested, handleBidResponse } from "../src/collector.js";
-import type { Bid } from "../src/types/bid.js";
+import type { Bid } from "../src/types/prebidEvent.js";
 
 // Mock dependencies
 const addEventsSpy = mock();
