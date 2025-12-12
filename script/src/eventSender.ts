@@ -194,8 +194,17 @@ export async function flush(): Promise<void> {
   // Clear queue immediately to prevent duplicates
   const payload = [...enrichedEvents];
   eventQueue = [];
-
   // Send the enriched payload
   sendPayload(payload, 0);
   logger.log(`[EventSender] Flushed ${payload.length} event(s)`);
+}
+
+/**
+ * Reset internal state - for testing only
+ */
+export function resetEventSender(): void {
+  eventQueue = [];
+  cachedIP = null;
+  ipFetchPromise = null;
+  initEventSender();
 }

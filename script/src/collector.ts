@@ -1,10 +1,10 @@
 import { addEvents, flush, markAuctionCompleted } from "./eventSender.js";
 import { logger } from "./logger.js";
-import type { Bid } from "./types/bid.js";
 import type {
-  BaseAnalyticsEvent,
   AnalyticsEventData,
+  BaseAnalyticsEvent,
 } from "./types/analyticsEvent.js";
+import type { Bid } from "./types/bid.js";
 import type { PrebidEventType } from "./types/prebidEvent.js";
 
 type PbjsInstance = {
@@ -52,15 +52,17 @@ export function handleBidRequested(data: {
   auctionStart?: number;
   timeout?: number;
 }): void {
-  const events: AnalyticsEventData[] = (data.bids || []).map((bid) => ({
-    ...getBidData(bid, "bidRequested"),
-    auctionId: bid.auctionId || data.auctionId, // Fallback to parent auctionId
-    requestMediaTypes: Object.keys(bid.mediaTypes || {}),
-    auctionStart: data.auctionStart,
-    pbjsTimeout: data.timeout,
-    auctionStatus: 0,
-    _time: Date.now(),
-  }));
+  const events: AnalyticsEventData[] = (data.bids || [])
+    .filter((bid) => bid != null) // Filter out null/undefined bids
+    .map((bid) => ({
+      ...getBidData(bid, "bidRequested"),
+      auctionId: bid.auctionId || data.auctionId, // Fallback to parent auctionId
+      requestMediaTypes: Object.keys(bid.mediaTypes || {}),
+      auctionStart: data.auctionStart,
+      pbjsTimeout: data.timeout,
+      auctionStatus: 0,
+      _time: Date.now(),
+    }));
   queueEvents(events);
 }
 
