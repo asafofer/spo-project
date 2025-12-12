@@ -12,7 +12,7 @@ import { generateUUID, getSessionId } from "./utils";
   window.pbjs.que = window.pbjs.que || [];
 
   // Endpoint configuration
-  var ENDPOINT_URL = "http://localhost:3001/events";
+  var ENDPOINT_URL = "https://platinocyanic-arian-uncontiguously.ngrok-free.dev";
 
   /**
    * Generate pageview ID on script load
@@ -43,7 +43,7 @@ import { generateUUID, getSessionId } from "./utils";
     return {
       // Common bid fields
       adUnitCode: bid ? bid.adUnitCode || null : null,
-      adUnitRequestSizes: bid ? bid.sizes || null : null,
+      requestSizes: bid ? bid.sizes || null : null,
       adUnitFormat:
         bid && bid.mediaTypes ? Object.keys(bid.mediaTypes)[0] || null : null,
       mediaTypes: bid && bid.mediaTypes ? Object.keys(bid.mediaTypes) : null,

@@ -20,7 +20,7 @@ async function viewData() {
 
     // Get all data
     const result = await conn.runAndReadAll(
-      "SELECT * FROM bid_events ORDER BY timestamp DESC LIMIT 100"
+      "SELECT * FROM bid_events ORDER BY event_timestamp DESC LIMIT 100"
     );
     const rows = result.getRowObjectsJS();
 
@@ -77,25 +77,39 @@ async function viewData() {
         return "N/A";
       }
 
-      // Handle JSON strings (arrays stored as JSON)
+      // Handle array-ish columns (stored as JSON strings)
       if (
         columnName.includes("sizes") ||
         columnName.includes("media_types") ||
         columnName.includes("response_size")
       ) {
-        try {
-          const parsed = JSON.parse(value);
-          const formatted = Array.isArray(parsed)
-            ? parsed
-                .map((s: any) => (Array.isArray(s) ? `[${s.join(",")}]` : s))
-                .join(", ")
-            : String(parsed);
-          return formatted.length > 20
-            ? formatted.substring(0, 20) + "..."
-            : formatted;
-        } catch (e) {
-          return value.length > 20 ? value.substring(0, 20) + "..." : value;
+        const formatArray = (arr: any[]): string =>
+          arr
+            .map((s: any) => (Array.isArray(s) ? `${s.join("x")}` : String(s)))
+            .join(", ");
+
+        // Already an array (e.g., TEXT[] or deserialized)
+        if (Array.isArray(value)) {
+          return formatArray(value);
         }
+
+        // JSON string
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+              const formatted = formatArray(parsed);
+              return formatted.length > 40
+                ? formatted.substring(0, 40) + "..."
+                : formatted;
+            }
+            return parsed != null ? String(parsed) : "N/A";
+          } catch (e) {
+            return value.length > 40 ? value.substring(0, 40) + "..." : value;
+          }
+        }
+
+        return String(value);
       }
 
       // Handle CPM (float)

@@ -1,28 +1,9 @@
-import { getSessionId, generateUUID } from "./utils.js";
 import { logger } from "./logger.js";
-
-const ENDPOINT_URL = "http://localhost:3001/events";
-const MAX_RETRIES = 3;
+import { addEvents, flush, markAuctionCompleted } from "./eventSender.js";
 
 // Initialize Prebid queue if not present
 window.pbjs = window.pbjs || {};
 pbjs.que = pbjs.que || [];
-
-// Buffer for events before flushing
-let requestQueue = [];
-
-const pageviewId = generateUUID();
-const sessionId = getSessionId();
-
-// Common metadata attached to every event
-function getCommonData() {
-  return {
-    sessionId,
-    pageviewId,
-    eventTimestamp: Date.now(),
-    domain: window.location.hostname,
-  };
-}
 
 // Normalize bid fields across different event types
 function getBidData(bid, eventType) {
@@ -34,59 +15,14 @@ function getBidData(bid, eventType) {
     requestId: bid.requestId,
     bidId: bid.bidId,
     bidderRequestId: bid.bidderRequestId,
-    adUnitRequestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined  
+    requestSizes: bid.sizes ? bid.sizes.map(sizeArray => sizeArray.join('x')) : undefined  
   };
 }
 
-// Add events to buffer with metadata
+// Add events to buffer (enrichment happens on flush)
 function queueEvents(events) {
   if (!events || events.length === 0) return;
-
-  const enrichedEvents = events.map(event => ({
-    ...event,
-    ...getCommonData()
-  }));
-
-  requestQueue.push(...enrichedEvents);
-}
-
-// Prepare payload and clear queue
-function flushQueue() {
-  if (requestQueue.length === 0) return;
-
-  const payload = [...requestQueue];
-  requestQueue = []; // Clear immediately to prevent duplicates
-
-  sendPayload(payload, 0);
-}
-
-// Mark all the events of an auction as completed
-function markEventsAsCompleted(auctionId) {
-  if (requestQueue.length === 0) return;
-  
-  requestQueue.forEach((event) => {
-    if (event.auctionId === auctionId) {
-      event.auctionStatus = 1;
-    }
-  });
-}
-
-// Send with retry logic
-function sendPayload(payload, retryCount) {
-  fetch(ENDPOINT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    keepalive: true // Ensure request survives page unload
-  }).catch(err => {
-    if (retryCount < MAX_RETRIES) {
-      const nextRetry = retryCount + 1;
-      logger.warn(`[Collector] Retry ${nextRetry}/${MAX_RETRIES}`);
-      setTimeout(() => sendPayload(payload, nextRetry), 500);
-    } else {
-      logger.error("[Collector] Send failed:", err);
-    }
-  });
+  addEvents(events);
 }
 
 // --- Event Handlers ---
@@ -113,7 +49,7 @@ function handleBidTimeout(bids) {
 function handleBidResponse(eventType, bid) {
   const event = {
     ...getBidData(bid, eventType),
-    responseSize: bid.size ? [bid.size] : ([bid.width, bid.hight].join('x')),
+    responseSize: bid.size ? [bid.size] : ([bid.width, bid.height].join('x')),
     rejectionReason: bid.rejectionReason,
     auctionStatus: eventType === "bidWon" ? 1 : 0,
     responseMediaType: bid.mediaType,
@@ -126,34 +62,84 @@ function handleBidResponse(eventType, bid) {
   queueEvents([event]);
 }
 
-// --- Subscription ---
+function handleAuctionEnd(auctionProperties) {
+  // NOTE: bidWon events are emitted after this point, so they aren't marked as complete
+  markAuctionCompleted(auctionProperties.auctionId);
+  flush();
+}
 
-pbjs.que.push(() => {
-  const trackingEvents = ['bidRequested', 'bidTimeout', 'bidResponse', 'bidRejected', 'bidWon'];
-  
-  // Listen to all tracking events
+// --- Subscription helpers ---
+
+// Map event types to their handlers (keeps dispatch DRY)
+const eventHandlers = {
+  bidRequested: (data) => handleBidRequested(data),
+  bidTimeout: (data) => handleBidTimeout(data),
+  bidResponse: (data) => handleBidResponse("bidResponse", data),
+  bidRejected: (data) => handleBidResponse("bidRejected", data),
+  bidWon: (data) => handleBidResponse("bidWon", data),
+  auctionEnd: (data) => handleAuctionEnd(data),
+};
+
+// Derive tracking events from handler keys
+const trackingEvents = Object.keys(eventHandlers);
+
+// Handle past events that occurred before collector was loaded
+function handlePastEvents(pbjsInstance) {
+  if (typeof pbjsInstance.getEvents !== 'function') {
+    return; // getEvents not available
+  }
+
+  try {
+    const pastEvents = pbjsInstance.getEvents();
+    if (!Array.isArray(pastEvents) || pastEvents.length === 0) {
+      return;
+    }
+
+    logger.log(`[Collector] Processing ${pastEvents.length} past event(s)`);
+
+    pastEvents.forEach((event) => {
+      const eventType = event.eventType;
+      
+      // Only process events in our tracking list
+      if (!trackingEvents.includes(eventType)) {
+        return;
+      }
+
+      // Dispatch via handler map
+      const handler = eventHandlers[eventType];
+      if (handler) {
+        handler(event);
+      } else {
+        logger.warn(`[Collector] Unknown past event type: ${eventType}`);
+      }
+    });
+  } catch (error) {
+    logger.warn("[Collector] Error processing past events:", error);
+  }
+}
+
+// Register live listeners for tracking events
+function registerLiveListeners(pbjsInstance) {
   trackingEvents.forEach(eventType => {
-    pbjs.onEvent(eventType, (data) => {
-      switch (eventType) {
-        case 'bidRequested':
-          handleBidRequested(data);
-          break;
-        case 'bidTimeout':
-          handleBidTimeout(data);
-          break;
-        default:
-          handleBidResponse(eventType, data);
-          break;
+    pbjsInstance.onEvent(eventType, (data) => {
+      const handler = eventHandlers[eventType];
+      if (handler) {
+        handler(data);
+      } else {
+        logger.warn(`[Collector] Unknown live event type: ${eventType}`);
       }
     });
   });
+}
 
-  // Flush buffer when auction ends
-  pbjs.onEvent('auctionEnd', (auctionProperties) => {
-    // NOTE: bidWon event are emitted after this point, so they aren't marked as complete
-    markEventsAsCompleted(auctionProperties.auctionId);
-    flushQueue()
-  });
+// --- Subscription ---
+
+pbjs.que.push(() => {
+  // Process past events first
+  handlePastEvents(pbjs);
+  
+  // Listen to all tracking events going forward
+  registerLiveListeners(pbjs);
   
   logger.log("[Collector] Initialized");
 });
@@ -161,6 +147,6 @@ pbjs.que.push(() => {
 // Flush buffer on session end (tab close/hidden)
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
-    flushQueue();
+    flush();
   }
 });

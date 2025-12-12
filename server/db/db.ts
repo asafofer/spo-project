@@ -47,9 +47,9 @@ export async function initDatabase(): Promise<void> {
         bid_id TEXT,
         bidder_request_id TEXT,
         request_id TEXT,
-        request_sizes TEXT[],
+        request_sizes TEXT,
         response_size TEXT,
-        request_media_types TEXT[],
+        request_media_types TEXT,
         response_media_type TEXT,
         auction_start BIGINT,
         pbjs_timeout INTEGER,
@@ -79,31 +79,56 @@ export async function saveFormattedEvent(event: BidEvent): Promise<void> {
     throw new Error("Database connection not initialized");
   }
 
-  const requestSizesArr = event.requestSizes
-    ? JSON.stringify(event.requestSizes)
+  const requestSizesArr =
+    event.requestSizes && Array.isArray(event.requestSizes)
+      ? event.requestSizes
+          .map((size) => {
+            if (size == null) return null;
+            if (Array.isArray(size)) return size.join("x");
+            return String(size);
+          })
+          .filter((v): v is string => typeof v === "string" && v.length > 0)
+      : null;
+
+  const normalizedRequestSizes =
+    requestSizesArr && requestSizesArr.length > 0 ? requestSizesArr : null;
+  const requestSizesJson = normalizedRequestSizes
+    ? JSON.stringify(normalizedRequestSizes)
     : null;
 
   const responseSizeStr = event.responseSize
     ? JSON.stringify(event.responseSize)
     : null;
 
-  const requestMediaTypesArr = event.requestMediaTypes
-    ? JSON.stringify(event.requestMediaTypes)
+  const requestMediaTypesArr =
+    event.requestMediaTypes && Array.isArray(event.requestMediaTypes)
+      ? event.requestMediaTypes
+          .map((v) => (v == null ? null : String(v)))
+          .filter((v): v is string => typeof v === "string" && v.length > 0)
+      : null;
+
+  const normalizedRequestMediaTypes =
+    requestMediaTypesArr && requestMediaTypesArr.length > 0
+      ? requestMediaTypesArr
+      : null;
+  const requestMediaTypesJson = normalizedRequestMediaTypes
+    ? JSON.stringify(normalizedRequestMediaTypes)
     : null;
 
-  const responseMediaTypeStr = event.responseMediaType
-    ? JSON.stringify(event.responseMediaType)
-    : null;
+  // Response media type is a single string (e.g., "banner", "video")
+  const responseMediaTypeStr =
+    event.responseMediaType != null ? String(event.responseMediaType) : null;
 
   // Convert timestamps to numbers (handle string, bigint, number)
+  // Use BigInt for timestamp-like fields to avoid precision/overflow issues
   const auctionStart =
-    event.auctionStart != null ? Number(event.auctionStart) : null;
+    event.auctionStart != null ? BigInt(event.auctionStart) : null;
   const eventTimestamp =
-    event.eventTimestamp != null ? Number(event.eventTimestamp) : null;
+    event.eventTimestamp != null ? BigInt(event.eventTimestamp) : null;
   const requestTimestampValue =
-    event.requestTimestamp != null ? Number(event.requestTimestamp) : null;
+    event.requestTimestamp != null ? BigInt(event.requestTimestamp) : null;
   const responseTimestampValue =
-    event.responseTimestamp != null ? Number(event.responseTimestamp) : null;
+    event.responseTimestamp != null ? BigInt(event.responseTimestamp) : null;
 
   await conn.run(
     `INSERT INTO bid_events (
@@ -139,9 +164,9 @@ export async function saveFormattedEvent(event: BidEvent): Promise<void> {
       event.bidId || null,
       event.bidderRequestId || null,
       event.requestId || null,
-      requestSizesArr,
+      requestSizesJson,
       responseSizeStr,
-      requestMediaTypesArr,
+      requestMediaTypesJson,
       responseMediaTypeStr,
       auctionStart,
       event.pbjsTimeout || null,
@@ -184,7 +209,7 @@ export async function getData(limit: number = 100): Promise<any[]> {
   }
 
   const result = await conn.runAndReadAll(
-    `SELECT * FROM bid_events ORDER BY timestamp DESC LIMIT ${limit}`
+    `SELECT * FROM bid_events ORDER BY event_timestamp DESC LIMIT ${limit}`
   );
   return result.getRowObjectsJS();
 }

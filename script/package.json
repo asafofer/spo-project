@@ -1,11 +1,16 @@
 {
   "name": "prebid-collector-script",
+  "version": "1.0.0",
   "module": "src/collctor.js",
   "type": "module",
   "scripts": {
     "build": "bun run build.ts",
     "watch": "bun run --watch build.ts",
-    "serve": "bun run serve.ts"
+    "serve": "bun run build.ts && bun run serve.ts",
+    "version:patch": "bun run version.ts patch",
+    "version:minor": "bun run version.ts minor",
+    "version:major": "bun run version.ts major",
+    "version": "bun run version.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
