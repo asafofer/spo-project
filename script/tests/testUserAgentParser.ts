@@ -1,6 +1,12 @@
 import { parseUserAgent } from "../src/uaParser.js";
-import { browsers } from "../tests/data/browsers.js";
-import { os } from "../tests/data/os.js";
+import { browsers } from "./data/browsers.js";
+import { os } from "./data/os.js";
+
+type TestCase = {
+  desc: string;
+  ua: string;
+  expect: { name: string; version?: string; major?: string };
+};
 
 console.log("🚀 Starting Micro Parser Tests...");
 
@@ -8,7 +14,7 @@ console.log("🚀 Starting Micro Parser Tests...");
 // 1. Configuration & Mappings
 // ==========================================
 // Maps the "Expected" names from your dataset to the "Actual" names returned by the parser.
-const BROWSER_MAPPINGS = {
+const BROWSER_MAPPINGS: Record<string, string> = {
   "Samsung Internet": "samsung browser",
   "Mobile Chrome": "chrome",
   "Mobile Firefox": "firefox",
@@ -26,7 +32,7 @@ const BROWSER_MAPPINGS = {
   GSA: "gsa",
 };
 
-const OS_MAPPINGS = {
+const OS_MAPPINGS: Record<string, string> = {
   macOS: "mac os",
   "Mac OS": "mac os",
   iOS: "ios",
@@ -77,7 +83,10 @@ const SUPPORTED_OS = new Set([
 // ==========================================
 const stats = { total: 0, passed: 0, failed: 0, skipped: 0 };
 
-function runTests(dataset, type) {
+function runTests(
+  dataset: TestCase[],
+  type: "Browsers" | "Operating Systems"
+): void {
   console.log(`\n--- Testing ${type} ---`);
 
   dataset.forEach((testCase) => {
@@ -86,7 +95,8 @@ function runTests(dataset, type) {
     let expectedNormalized = expectedRaw;
 
     // Apply Mappings
-    const map = type === "Browsers" ? BROWSER_MAPPINGS : OS_MAPPINGS;
+    const map: Record<string, string> =
+      type === "Browsers" ? BROWSER_MAPPINGS : OS_MAPPINGS;
     if (map[expectedRaw]) {
       expectedNormalized = map[expectedRaw];
     }
@@ -136,5 +146,5 @@ try {
   console.log(`Skipped:     ${stats.skipped} (Unsupported types)`);
   console.log("=".repeat(40));
 } catch (error) {
-  console.error("\n💥 CRITICAL ERROR:", error.message);
+  console.error("\n💥 CRITICAL ERROR:", (error as Error).message);
 }

@@ -1,4 +1,14 @@
-export const os = [
+type OSTestCase = {
+  desc: string;
+  ua: string;
+  expect: {
+    name: string;
+    version?: string;
+    [key: string]: unknown;
+  };
+};
+
+export const os: OSTestCase[] = [
   {
     desc: "Android",
     ua: "Mozilla/5.0 (Linux; U; Android 2.2.2; en-us; VM670 Build/FRG83G) AppleWebKit/533.1 (KHTML, like Gecko)",

@@ -1,6 +1,8 @@
 // parser.js
 
-const osPatterns = [
+type Pattern = { regex: RegExp; name: string };
+
+const osPatterns: Pattern[] = [
   // Fixed: Added specific devices and tokens for iOS/Apple TV/HomePod
   // Checking 'ios', 'darwin', 'cfnetwork' helps catch non-standard apps.
   // Order matters: 'iphone' etc. are specific. 'darwin' is a fallback for this dataset.
@@ -19,7 +21,7 @@ const osPatterns = [
   { regex: /linux/i, name: "linux" },
 ];
 
-const browserPatterns = [
+const browserPatterns: Pattern[] = [
   // --- Specific In-App / Niche Browsers (Check these first) ---
   { regex: /fban|fbav/i, name: "facebook" },
   { regex: /instagram/i, name: "instagram" },
@@ -59,11 +61,13 @@ const browserPatterns = [
 /**
  * Parses a user agent string to extract the OS and Browser.
  * Only detects high-volume items (count >= 100).
- *
- * @param {string} userAgent
- * @returns {{ operatingSystem: string|null, browser: string|null }}
  */
-export const parseUserAgent = (userAgent) => {
+export const parseUserAgent = (
+  userAgent: string | null | undefined
+): {
+  operatingSystem: string | null;
+  browser: string | null;
+} => {
   if (!userAgent) {
     return { operatingSystem: null, browser: null };
   }

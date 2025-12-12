@@ -2,7 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const PACKAGE_JSON_PATH = join(import.meta.dir, "package.json");
+const PACKAGE_JSON_PATH = join(import.meta.dir, "..", "package.json");
 
 /**
  * Parse version string into major.minor.patch
@@ -18,7 +18,7 @@ function parseVersion(version: string): [number, number, number] {
 function formatVersion([major, minor, patch]: [
   number,
   number,
-  number,
+  number
 ]): string {
   return `${major}.${minor}.${patch}`;
 }
@@ -28,7 +28,7 @@ function formatVersion([major, minor, patch]: [
  */
 function bumpVersion(
   current: string,
-  type: "major" | "minor" | "patch",
+  type: "major" | "minor" | "patch"
 ): string {
   const [major, minor, patch] = parseVersion(current);
 
@@ -66,7 +66,7 @@ async function main() {
     await writeFile(
       PACKAGE_JSON_PATH,
       JSON.stringify(packageJson, null, 2) + "\n",
-      "utf-8",
+      "utf-8"
     );
 
     console.log(`Version bumped: ${currentVersion} → ${newVersion} (${type})`);

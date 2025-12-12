@@ -1,4 +1,15 @@
-export const browsers = [
+type BrowserTestCase = {
+  desc: string;
+  ua: string;
+  expect: {
+    name: string;
+    version?: string;
+    major?: string;
+    [key: string]: unknown;
+  };
+};
+
+export const browsers: BrowserTestCase[] = [
   {
     desc: "115 Browser",
     ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_16_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36 115Browser/24.3.0.3",

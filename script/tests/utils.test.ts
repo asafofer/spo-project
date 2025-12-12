@@ -3,13 +3,13 @@ import { Window } from "happy-dom";
 import { getSessionId } from "../src/utils.js";
 
 describe("Utils Module", () => {
-  let happyWindow;
+  let happyWindow: Window;
 
   beforeEach(() => {
     // Fresh environment for every test
     happyWindow = new Window();
-    globalThis.sessionStorage = happyWindow.sessionStorage;
-    globalThis.crypto = { randomUUID: () => "mock-uuid-1234" };
+    (globalThis as any).sessionStorage = happyWindow.sessionStorage;
+    (globalThis as any).crypto = { randomUUID: () => "mock-uuid-1234" };
   });
 
   test("getSessionId generates new ID if missing", () => {

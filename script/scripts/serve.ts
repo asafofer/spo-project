@@ -11,8 +11,8 @@ Bun.serve({
     let path = url.pathname;
     if (path === "/") path = "/index.html";
 
-    // Resolve file relative to the current directory (script/)
-    const file = Bun.file(import.meta.dir + path);
+    // Resolve file relative to the script directory (one level up from scripts/)
+    const file = Bun.file(import.meta.dir + "/.." + path);
 
     return new Response(file);
   },

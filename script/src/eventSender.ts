@@ -3,6 +3,10 @@
 import { logger } from "./logger.js";
 import { parseUserAgent } from "./uaParser.js";
 import { generateUUID, getSessionId } from "./utils.js";
+import type {
+  AnalyticsEventData,
+  AnalyticsEvent,
+} from "./types/analyticsEvent.js";
 
 const EVENTS_ENDPOINT_URL =
   "https://us-east-1.aws.edge.axiom.co/v1/ingest/prebid-events";
@@ -14,11 +18,11 @@ const VERSION = "__VERSION__"; // Will be replaced at build time from package.js
 const pageviewId = generateUUID();
 const sessionId = getSessionId();
 let userAgent = "";
-let uaInfo;
+let uaInfo: ReturnType<typeof parseUserAgent>;
 
-function initEventSender() {
+function initEventSender(): void {
   if (typeof navigator !== "undefined") {
-    userAgent = navigator.userAgent;
+    userAgent = (navigator as any).userAgent;
   }
   uaInfo = parseUserAgent(userAgent);
 }
@@ -26,14 +30,13 @@ function initEventSender() {
 initEventSender();
 
 // IP cache - fetched once per page load
-let cachedIP = null;
-let ipFetchPromise = null;
+let cachedIP: string | null = null;
+let ipFetchPromise: Promise<string | null> | null = null;
 
 /**
  * Fetch IP from Cloudflare trace endpoint
- * @returns {Promise<string|null>} IP address or null if fetch fails
  */
-async function fetchIP() {
+async function fetchIP(): Promise<string | null> {
   if (cachedIP !== null) {
     return cachedIP;
   }
@@ -56,7 +59,7 @@ async function fetchIP() {
       // Parse the trace response to extract IP
       // Format: "fl=...\nh=...\nip=1.2.3.4\n..."
       const ipMatch = text.match(/^ip=([^\n]+)/m);
-      const ip = ipMatch ? ipMatch[1] : null;
+      const ip: string | null = ipMatch?.[1] ?? null;
       cachedIP = ip;
       logger.log(`[EventSender] Fetched IP: ${ip || "unknown"}`);
       return ip;
@@ -75,20 +78,30 @@ async function fetchIP() {
 
 /**
  * Check if we're in a browser environment
- * @returns {boolean}
  */
-function isBrowser() {
+function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
 /**
  * Get common metadata for events (includes IP if available, or yotoCountry if yotoApp.country exists)
- * @returns {Promise<Object>} Common data object
  */
-async function getCommonData() {
-  const yotoCountry = isBrowser() ? window.yotoApp?.country : undefined;
+async function getCommonData(): Promise<{
+  sessionId: string;
+  pageviewId: string;
+  eventTimestamp: number;
+  domain: string;
+  os: string | null;
+  browser: string | null;
+  ua: string;
+  ip: string | null;
+  yotoCountry: string | null;
+  version: string;
+}> {
+  const win = isBrowser() ? (window as any) : null;
+  const yotoCountry = win?.yotoApp?.country;
   const eventTimestamp = Date.now();
-  let ip = null;
+  let ip: string | null = null;
   if (!yotoCountry) {
     // Only fetch IP if yotoApp.country is not available
     ip = await fetchIP();
@@ -98,7 +111,7 @@ async function getCommonData() {
     sessionId,
     pageviewId,
     eventTimestamp: eventTimestamp,
-    domain: isBrowser() && window.location ? window.location.hostname : "",
+    domain: win?.location?.hostname || "",
     os: uaInfo.operatingSystem,
     browser: uaInfo.browser,
     ua: userAgent,
@@ -109,22 +122,20 @@ async function getCommonData() {
 }
 
 // Event buffer
-let eventQueue = [];
+let eventQueue: AnalyticsEventData[] = [];
 
 /**
  * Add events to the buffer
- * @param {Array<Object>} events - Events to add
  */
-export function addEvents(events) {
+export function addEvents(events: AnalyticsEventData[]): void {
   if (!events || events.length === 0) return;
   eventQueue.push(...events);
 }
 
 /**
  * Mark all events of an auction as completed
- * @param {string} auctionId - The auction ID
  */
-export function markAuctionCompleted(auctionId) {
+export function markAuctionCompleted(auctionId: string): void {
   if (eventQueue.length === 0) return;
 
   eventQueue.forEach((event) => {
@@ -136,10 +147,8 @@ export function markAuctionCompleted(auctionId) {
 
 /**
  * Send payload with retry logic
- * @param {Array<Object>} payload - Events to send
- * @param {number} retryCount - Current retry attempt
  */
-function sendPayload(payload, retryCount = 0) {
+function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
   fetch(EVENTS_ENDPOINT_URL, {
     method: "POST",
     headers: {
@@ -161,13 +170,13 @@ function sendPayload(payload, retryCount = 0) {
 
 /**
  * Flush all queued events - waits for IP to be fetched before sending
- * @returns {Promise<void>}
  */
-export async function flush() {
+export async function flush(): Promise<void> {
   if (eventQueue.length === 0) return;
 
   // Check if we need to fetch IP (only if yotoApp.country doesn't exist)
-  const yotoCountry = isBrowser() ? window.yotoApp?.country : undefined;
+  const win = isBrowser() ? (window as any) : null;
+  const yotoCountry = win?.yotoApp?.country;
   if (!yotoCountry) {
     // Wait for IP to be fetched (or timeout) only if yotoApp.country is not available
     await fetchIP();
@@ -175,11 +184,11 @@ export async function flush() {
 
   // Enrich all events with common data (including IP or yotoCountry)
   const commonData = await getCommonData();
-  const enrichedEvents = eventQueue.map((event) => ({
+  const enrichedEvents: AnalyticsEvent[] = eventQueue.map((event) => ({
     ...event,
     ...commonData,
-    // Preserve event-specific timestamp if it exists
-    eventTimestamp: event.eventTimestamp || commonData.eventTimestamp,
+    // Use event's _time if set, otherwise use commonData timestamp
+    _time: event._time || commonData.eventTimestamp,
   }));
 
   // Clear queue immediately to prevent duplicates
