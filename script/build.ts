@@ -3,7 +3,7 @@ const packageJson = await Bun.file('./package.json').json();
 const version = packageJson.version || '1.0.0';
 
 const result = await Bun.build({
-  entrypoints: ['./src/collector.research.js'],
+  entrypoints: ['./src/collector.js'],
   outdir: './dist',
   naming: 'collector.prod.js', // Force specific output name
   target: 'browser',
