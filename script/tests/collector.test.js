@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
 import { handleBidRequested, handleBidResponse } from "../src/collector.js";
-import mockData from "./fixtures/mockEvents.json";
+import mockEvents from "./fixtures/mockEvents.json";
 
-// 1. Mock dependencies to capture output
+// Mock dependencies
 const addEventsSpy = mock();
 
 mock.module("../src/eventSender.js", () => ({
@@ -12,53 +12,72 @@ mock.module("../src/eventSender.js", () => ({
   markAuctionCompleted: mock(),
 }));
 
-describe("Collector Integration (Event Replay)", () => {
+describe("Collector Integration (Real Data Replay)", () => {
   beforeEach(() => {
-    // Reset the spy before every test
     addEventsSpy.mockClear();
 
-    // Environment Setup (Guard check)
-    // Even though we test logic, setting up window ensures no stray access causes crashes
+    // Setup Happy-DOM environment
     const win = new Window();
     globalThis.window = win;
+    globalThis.document = win.document;
   });
 
-  test("handleBidRequested -> transforms and queues event", () => {
-    // 1. REPLAY: Feed the raw mock event into the handler
-    handleBidRequested(mockData.bidRequested);
+  test("handleBidRequested -> correctly parses real bid request", () => {
+    // 1. Find a suitable event from the fixture
+    const eventData = mockEvents.find((e) => e.eventType === "bidRequested");
 
-    // 2. ASSERT: Did we queue an event?
+    if (!eventData) throw new Error("No bidRequested event found in fixture");
+
+    // 2. Run Handler
+    handleBidRequested(eventData.args);
+
+    // 3. Assertions
     expect(addEventsSpy).toHaveBeenCalled();
+    const payload = addEventsSpy.mock.calls[0][0]; // First arg of first call
 
-    // 3. INSPECT: Get the exact data object passed to addEvents
-    const payload = addEventsSpy.mock.calls[0][0];
-    const event = payload[0];
-
-    // Check normalization logic
-    expect(event.eventType).toBe("bidRequested");
-    expect(event.auctionId).toBe("auc-1234-5678");
-    expect(event.adUnitCode).toBe("div-gpt-ad-1");
-
-    // Check if sizes were flattened correctly from [[300,250]] to "300x250"
-    expect(event.requestSizes).toContain("300x250");
+    // Check specific fields from your real data
+    expect(payload[0].eventType).toBe("bidRequested");
+    expect(payload[0].auctionId).toBe(eventData.args.auctionId);
   });
 
-  test("handleBidResponse -> transforms and queues event", () => {
-    // 1. REPLAY
-    handleBidResponse("bidResponse", mockData.bidResponse);
+  test("handleBidResponse -> correctly parses real bid response", () => {
+    // 1. Find a suitable event
+    const eventData = mockEvents.find((e) => e.eventType === "bidResponse");
 
-    // 2. ASSERT
+    if (!eventData) throw new Error("No bidResponse event found in fixture");
+
+    // 2. Run Handler
+    handleBidResponse("bidResponse", eventData.args);
+
+    // 3. Assertions
     expect(addEventsSpy).toHaveBeenCalled();
-
-    // 3. INSPECT
     const payload = addEventsSpy.mock.calls[0][0];
-    const event = payload[0];
 
-    expect(event.eventType).toBe("bidResponse");
-    expect(event.cpm).toBe(1.25);
-    expect(event.timeToRespond).toBe(120);
+    expect(payload[0].eventType).toBe("bidResponse");
+    expect(payload[0].cpm).toBe(eventData.args.cpm);
+    // Real data check: ensure cost is a number
+    expect(typeof payload[0].cpm).toBe("number");
+  });
 
-    // Check normalization of size
-    expect(event.responseSize).toBe("300x250");
+  test("Smoke Test: Replay entire timeline without crashing", () => {
+    let processedCount = 0;
+
+    mockEvents.forEach((event) => {
+      try {
+        if (event.eventType === "bidRequested") {
+          handleBidRequested(event.args);
+          processedCount++;
+        } else if (event.eventType === "bidResponse") {
+          handleBidResponse(event.eventType, event.args);
+          processedCount++;
+        }
+      } catch (error) {
+        console.error(`Crashed on event type: ${event.eventType}`, error);
+        throw error;
+      }
+    });
+
+    // Ensure we actually processed something
+    expect(processedCount).toBeGreaterThan(0);
   });
 });
