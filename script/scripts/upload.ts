@@ -7,6 +7,7 @@ const rootDir = join(import.meta.dir, "..");
 const envFile = join(rootDir, ".env");
 const distDir = join(rootDir, "dist");
 const defaultBuildFile = join(distDir, "collector.prod.js");
+const PUBLIC_FILE_URL = "https://trkimp.com/collector.prod.js";
 
 /**
  * Truncate sensitive values for display
@@ -112,13 +113,10 @@ async function uploadToR2(
       console.log(`   ETag: ${response.ETag}`);
     }
 
-    const publicUrl = process.env.R2_PUBLIC_URL;
-    if (publicUrl) {
-      const fullUrl = publicUrl.endsWith("/")
-        ? `${publicUrl}${objectKey}`
-        : `${publicUrl}/${objectKey}`;
-      console.log(`   Public URL: ${fullUrl}`);
-    }
+    // Create clickable link using OSC 8 escape sequence
+    // Format: \x1b]8;;URL\x1b\\TEXT\x1b]8;;\x1b\\
+    const clickableUrl = `\x1b]8;;${PUBLIC_FILE_URL}\x1b\\${PUBLIC_FILE_URL}\x1b]8;;\x1b\\`;
+    console.log(`   Public URL: ${clickableUrl}`);
   } catch (error: any) {
     console.error(`❌ Upload failed`);
     throw new Error(`R2 upload failed: ${error.message || error}`);
@@ -188,6 +186,7 @@ async function runUpload() {
     const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
     console.log(`   File Size: ${fileSizeMB} MB`);
   }
+  console.log("\n");
 
   // Confirm before proceeding
   const confirmed = await confirm({
@@ -213,7 +212,18 @@ async function runUpload() {
 
   // Upload to R2
   await uploadToR2(buildFilePath, process.env.R2_BUCKET_NAME, finalObjectKey);
+
+  // Display final URL prominently
+  // Create clickable link using OSC 8 escape sequence
+  const clickableUrl = `\x1b]8;;${PUBLIC_FILE_URL}\x1b\\${PUBLIC_FILE_URL}\x1b]8;;\x1b\\`;
+  console.log(`\n🔗 File URL: ${clickableUrl}\n`);
 }
+
+// Handle Ctrl+C gracefully
+process.on("SIGINT", () => {
+  console.log("\n\n⚠️  Upload cancelled by user (Ctrl+C)");
+  process.exit(0);
+});
 
 runUpload().catch((error) => {
   console.error("❌ Error:", error);

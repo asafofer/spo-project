@@ -168,6 +168,12 @@ async function deploy() {
   console.log("Cache Purge: ✅\n");
 }
 
+// Handle Ctrl+C gracefully
+process.on("SIGINT", () => {
+  console.log("\n\n⚠️  Deployment cancelled by user (Ctrl+C)");
+  process.exit(0);
+});
+
 deploy().catch((error) => {
   console.error("❌ Deployment error:", error);
   process.exit(1);

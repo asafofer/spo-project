@@ -143,6 +143,12 @@ async function runPurgeCache() {
   }
 }
 
+// Handle Ctrl+C gracefully
+process.on("SIGINT", () => {
+  console.log("\n\n⚠️  Cache purge cancelled by user (Ctrl+C)");
+  process.exit(0);
+});
+
 runPurgeCache().catch((error: unknown) => {
   const errorMessage = error instanceof Error ? error.message : String(error);
   console.error("❌ Error:", errorMessage);
