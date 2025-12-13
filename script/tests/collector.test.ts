@@ -51,6 +51,10 @@ describe("Collector Integration (Real Data Replay)", () => {
     expect((firstEvent as any).auctionId).toBe(
       (eventData.args as any).auctionId
     );
+    // Verify _time is always set
+    expect(firstEvent).toHaveProperty("_time");
+    expect(typeof (firstEvent as any)._time).toBe("number");
+    expect((firstEvent as any)._time).toBeGreaterThan(0);
   });
 
   test("handleBidResponse -> correctly parses real bid response", () => {
@@ -77,6 +81,10 @@ describe("Collector Integration (Real Data Replay)", () => {
     expect((firstEvent as any).cpm).toBe((eventData.args as Bid).cpm);
     // Real data check: ensure cost is a number
     expect(typeof (firstEvent as any).cpm).toBe("number");
+    // Verify _time is always set
+    expect(firstEvent).toHaveProperty("_time");
+    expect(typeof (firstEvent as any)._time).toBe("number");
+    expect((firstEvent as any)._time).toBeGreaterThan(0);
   });
 
   test("handleBidResponse -> bidRejected event type", () => {

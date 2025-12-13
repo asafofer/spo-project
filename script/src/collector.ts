@@ -10,6 +10,7 @@ import type {
   PrebidEvent,
   PrebidEventType,
 } from "./types/prebidEvent.js";
+import { extractEventTimestamp } from "./utils.js";
 
 type PbjsInstance = {
   getEvents?: () => PastEvent[];
@@ -53,12 +54,18 @@ function queueEvents(events: AnalyticsEventData[]): void {
 
 // --- Event Handlers ---
 
-export function handleBidRequested(data: {
-  bids?: Bid[];
-  auctionId?: string;
-  auctionStart?: number;
-  timeout?: number;
-}): void {
+export function handleBidRequested(
+  data: {
+    bids?: Bid[];
+    auctionId?: string;
+    auctionStart?: number;
+    start?: number; // From bidderRequest.start = timestamp()
+    timeout?: number;
+  },
+  elapsedTime?: number
+): void {
+  // Extract timestamp from bidderRequest (parent) - all bids share the same start time
+  const eventTimestamp = extractEventTimestamp("bidRequested", data, elapsedTime);
   const events: AnalyticsEventData[] = (data.bids || [])
     .filter((bid) => bid != null) // Filter out null/undefined bids
     .map((bid) => ({
@@ -68,24 +75,33 @@ export function handleBidRequested(data: {
       auctionStart: data.auctionStart,
       pbjsTimeout: data.timeout,
       auctionStatus: 0,
-      _time: Date.now(),
+      _time: eventTimestamp, // All bids from same bidderRequest share the same timestamp
     }));
   queueEvents(events);
 }
 
-function handleBidTimeout(bids: Bid[] | undefined): void {
-  const events: AnalyticsEventData[] = (bids || []).map((bid) => ({
-    ...getBidData(bid, "bidTimeout"),
-    pbjsTimeout: bid.timeout,
-    auctionStatus: 0,
-  }));
+function handleBidTimeout(
+  bids: Bid[] | undefined,
+  elapsedTime?: number
+): void {
+  const events: AnalyticsEventData[] = (bids || []).map((bid) => {
+    const eventTimestamp = extractEventTimestamp("bidTimeout", bid, elapsedTime);
+    return {
+      ...getBidData(bid, "bidTimeout"),
+      pbjsTimeout: bid.timeout,
+      auctionStatus: 0,
+      _time: eventTimestamp,
+    };
+  });
   queueEvents(events);
 }
 
 export function handleBidResponse(
   eventType: "bidResponse" | "bidRejected" | "bidWon",
-  bid: Bid
+  bid: Bid,
+  elapsedTime?: number
 ): void {
+  const eventTimestamp = extractEventTimestamp(eventType, bid, elapsedTime);
   const event: AnalyticsEventData = {
     ...getBidData(bid, eventType),
     responseSize: bid.size
@@ -99,12 +115,18 @@ export function handleBidResponse(
     timeToRespond: bid.timeToRespond,
     cpm: bid.cpm,
     currency: bid.currency,
+    _time: eventTimestamp,
   };
   queueEvents([event]);
 }
 
-function handleAuctionEnd(auctionProperties: { auctionId: string }): void {
+function handleAuctionEnd(
+  auctionProperties: { auctionId: string; timestamp?: number; auctionEnd?: number },
+  elapsedTime?: number
+): void {
   // NOTE: bidWon events are emitted after this point, so they aren't marked as complete
+  // Note: auctionEnd doesn't create an event, it just marks auctions as complete and flushes
+  // But we should still track when it happened for debugging purposes
   markAuctionCompleted(auctionProperties.auctionId);
   flush();
 }
@@ -112,30 +134,34 @@ function handleAuctionEnd(auctionProperties: { auctionId: string }): void {
 // --- Subscription helpers ---
 
 // Map event types to their handlers (keeps dispatch DRY)
-const eventHandlers: Record<string, (data: PrebidEvent) => void> = {
-  bidRequested: (data) => {
+// Handlers accept optional elapsedTime for past events
+const eventHandlers: Record<
+  string,
+  (data: PrebidEvent, elapsedTime?: number) => void
+> = {
+  bidRequested: (data, elapsedTime) => {
     const event = data as Extract<PrebidEvent, { eventType?: "bidRequested" }>;
-    handleBidRequested(event);
+    handleBidRequested(event, elapsedTime);
   },
-  bidTimeout: (data) => {
+  bidTimeout: (data, elapsedTime) => {
     // Prebid sends Bid[] directly for bidTimeout
-    handleBidTimeout(data as Bid[]);
+    handleBidTimeout(data as Bid[], elapsedTime);
   },
-  bidResponse: (data) => {
+  bidResponse: (data, elapsedTime) => {
     // Prebid sends Bid directly for bidResponse
-    handleBidResponse("bidResponse", data as Bid);
+    handleBidResponse("bidResponse", data as Bid, elapsedTime);
   },
-  bidRejected: (data) => {
+  bidRejected: (data, elapsedTime) => {
     // Prebid sends Bid directly for bidRejected
-    handleBidResponse("bidRejected", data as Bid);
+    handleBidResponse("bidRejected", data as Bid, elapsedTime);
   },
-  bidWon: (data) => {
+  bidWon: (data, elapsedTime) => {
     // Prebid sends Bid directly for bidWon
-    handleBidResponse("bidWon", data as Bid);
+    handleBidResponse("bidWon", data as Bid, elapsedTime);
   },
-  auctionEnd: (data) => {
+  auctionEnd: (data, elapsedTime) => {
     const event = data as Extract<PrebidEvent, { eventType?: "auctionEnd" }>;
-    handleAuctionEnd(event);
+    handleAuctionEnd(event, elapsedTime);
   },
 };
 
@@ -169,11 +195,16 @@ function handlePastEvents(pbjsInstance: PbjsInstance): void {
 
       // Extract the actual payload from args (past events are wrapped)
       const eventPayload = pastEvent.args;
+      // Extract elapsedTime to calculate actual event timestamp
+      const elapsedTime =
+        typeof pastEvent.elapsedTime === "number"
+          ? pastEvent.elapsedTime
+          : undefined;
 
-      // Dispatch via handler map
+      // Dispatch via handler map, passing elapsedTime for timestamp calculation
       const handler = eventHandlers[eventType as PrebidEventType];
       if (handler) {
-        handler(eventPayload);
+        handler(eventPayload, elapsedTime);
       } else {
         logger.warn(`[Collector] Unknown past event type: ${eventType}`);
       }

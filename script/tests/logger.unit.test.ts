@@ -9,6 +9,15 @@ describe("Logger Module", () => {
   let consoleErrorSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
+    // Setup performance API before creating Window (happy-dom needs it)
+    if (!(globalThis as any).performance) {
+      const mockTimeOrigin = Date.now() - 5000;
+      (globalThis as any).performance = {
+        timeOrigin: mockTimeOrigin,
+        now: () => 5000,
+      };
+    }
+
     // Fresh environment for every test
     happyWindow = new Window();
     (globalThis as any).window = happyWindow.window;
