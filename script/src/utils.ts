@@ -25,6 +25,28 @@ function isBrowserWindow(): boolean {
 }
 
 /**
+ * Check if sessionStorage is available and usable
+ */
+export function isSessionStorageAvailable(): boolean {
+  if (!isBrowserWindow()) {
+    return false;
+  }
+  try {
+    const win = window as any;
+    const storage = win.sessionStorage;
+    const x = "__storage_test__";
+    storage.setItem(x, x);
+    const retrieved = storage.getItem(x);
+    storage.removeItem(x);
+    return retrieved === x;
+  } catch (e) {
+    // e.name === 'QuotaExceededError' // Storage full
+    // e.name === 'SecurityError'      // Cookies disabled / Sandboxed
+    return false;
+  }
+}
+
+/**
  * Get or create session ID from sessionStorage
  * Session persists across page reloads but not across browser sessions
  */
