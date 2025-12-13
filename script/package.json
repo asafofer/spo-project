@@ -6,7 +6,7 @@
   "scripts": {
     "build": "bun run scripts/build.ts",
     "watch": "bun run --watch scripts/build.ts",
-    "serve": "bun run scripts/build.ts && bun run scripts/serve.ts",
+    "serve": "bun run scripts/serve.ts",
     "version:patch": "bun run scripts/version.ts patch",
     "version:minor": "bun run scripts/version.ts minor",
     "version:major": "bun run scripts/version.ts major",
