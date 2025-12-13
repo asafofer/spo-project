@@ -53,9 +53,8 @@ async function deploy() {
 
   // Prompt for version bump
   const versionBump = await select({
-    message: "Bump version?",
+    message: "Select version bump type:",
     choices: [
-      { name: "No bump (keep current version)", value: "none" },
       {
         name: `Patch (${currentVersion} → ${bumpVersion(
           currentVersion,
@@ -80,24 +79,20 @@ async function deploy() {
     ],
   });
 
-  // Bump version if selected
-  if (versionBump !== "none") {
-    const bumpSuccess = await runCommand(
-      ["bun", "run", "scripts/version.ts", versionBump],
-      `📦 Bumping version (${versionBump})`
-    );
+  // Bump version
+  const bumpSuccess = await runCommand(
+    ["bun", "run", "scripts/version.ts", versionBump],
+    `📦 Bumping version (${versionBump})`
+  );
 
-    if (!bumpSuccess) {
-      console.error("\n❌ Version bump failed. Deployment aborted.");
-      process.exit(1);
-    }
-
-    // Get the new version
-    const newVersion = await getCurrentVersion();
-    console.log(`\n✅ Version updated to: ${newVersion}\n`);
-  } else {
-    console.log(`\n📦 Keeping current version: ${currentVersion}\n`);
+  if (!bumpSuccess) {
+    console.error("\n❌ Version bump failed. Deployment aborted.");
+    process.exit(1);
   }
+
+  // Get the new version
+  const newVersion = await getCurrentVersion();
+  console.log(`\n✅ Version updated to: ${newVersion}\n`);
 
   // Prompt for sample rate
   const sampleRateInput = await input({
