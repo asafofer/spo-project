@@ -47,7 +47,6 @@ async function getCurrentVersion(): Promise<string> {
 async function deploy() {
   console.log("🚀 Deployment Script\n");
 
-  // Get and display current version
   const currentVersion = await getCurrentVersion();
   console.log(`📦 Current version: ${currentVersion}\n`);
 
@@ -79,7 +78,6 @@ async function deploy() {
     ],
   });
 
-  // Bump version
   const bumpSuccess = await runCommand(
     ["bun", "run", "scripts/version.ts", versionBump],
     `📦 Bumping version (${versionBump})`
@@ -90,7 +88,6 @@ async function deploy() {
     process.exit(1);
   }
 
-  // Get the new version
   const newVersion = await getCurrentVersion();
   console.log(`\n✅ Version updated to: ${newVersion}\n`);
 
@@ -136,7 +133,6 @@ async function deploy() {
   console.log("Tests: ✅");
 
   // Step 3: Upload to R2
-  console.log("\n📤 Proceeding to upload...\n");
   const uploadSuccess = await runCommand(
     ["bun", "run", "upload"],
     "🚀 Uploading to R2",
@@ -149,7 +145,6 @@ async function deploy() {
   }
 
   // Step 4: Purge cache
-  console.log("\n🗑️  Proceeding to purge cache...\n");
   const purgeSuccess = await runCommand(
     ["bun", "run", "purge-cache"],
     "🗑️  Purging Cloudflare cache",

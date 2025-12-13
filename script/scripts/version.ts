@@ -54,14 +54,12 @@ async function main() {
   }
 
   try {
-    // Read package.json
     const packageJsonContent = await readFile(PACKAGE_JSON_PATH, "utf-8");
     const packageJson = JSON.parse(packageJsonContent);
 
     const currentVersion = packageJson.version || "0.0.0";
     const newVersion = bumpVersion(currentVersion, type);
 
-    // Update version in package.json
     packageJson.version = newVersion;
     await writeFile(
       PACKAGE_JSON_PATH,
@@ -69,11 +67,17 @@ async function main() {
       "utf-8"
     );
 
-    console.log(`Version bumped: ${currentVersion} → ${newVersion} (${type})`);
-  } catch (error) {
-    console.error("Error updating version:", error);
+    if (import.meta.main) {
+      console.log(
+        `Version bumped: ${currentVersion} → ${newVersion} (${type})`
+      );
+    }
+  } catch (error: any) {
+    console.error("Error updating version:", error.message || error);
     process.exit(1);
   }
 }
 
-main();
+if (import.meta.main) {
+  main();
+}

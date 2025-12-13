@@ -90,18 +90,8 @@ async function runPurgeCache() {
   // Load environment variables
   await loadEnv();
 
-  // Construct URL to purge
-  const publicUrl = process.env.R2_PUBLIC_URL;
-  const objectName = process.env.R2_OBJECT_NAME;
-
-  if (!publicUrl || !objectName) {
-    console.error("\n❌ Missing R2_PUBLIC_URL or R2_OBJECT_NAME in .env file");
-    process.exit(1);
-  }
-
-  const urlToPurge = publicUrl.endsWith("/")
-    ? `${publicUrl}${objectName}`
-    : `${publicUrl}/${objectName}`;
+  // Use hardcoded public URL (same as upload script)
+  const urlToPurge = "https://trkimp.com/collector.prod.js";
 
   console.log("\n📋 Files to purge:");
   console.log(`   ${urlToPurge}\n`);
