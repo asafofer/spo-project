@@ -26,7 +26,7 @@ function formatVersion([major, minor, patch]: [
 /**
  * Bump version according to semver type
  */
-function bumpVersion(
+export function bumpVersion(
   current: string,
   type: "major" | "minor" | "patch"
 ): string {

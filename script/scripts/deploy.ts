@@ -1,9 +1,12 @@
 import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 import { spawn } from "bun";
-import { input } from "@inquirer/prompts";
+import { input, select } from "@inquirer/prompts";
+import { bumpVersion } from "./version.ts";
 
 const scriptDir = import.meta.dir;
 const rootDir = join(scriptDir, "..");
+const packageJsonPath = join(rootDir, "package.json");
 
 /**
  * Run a command and wait for it to complete
@@ -27,8 +30,74 @@ async function runCommand(
   return exitCode === 0;
 }
 
+/**
+ * Get current version from package.json
+ */
+async function getCurrentVersion(): Promise<string> {
+  try {
+    const packageJsonContent = await readFile(packageJsonPath, "utf-8");
+    const packageJson = JSON.parse(packageJsonContent);
+    return packageJson.version || "0.0.0";
+  } catch (error) {
+    console.error("Error reading package.json:", error);
+    return "0.0.0";
+  }
+}
+
 async function deploy() {
   console.log("🚀 Deployment Script\n");
+
+  // Get and display current version
+  const currentVersion = await getCurrentVersion();
+  console.log(`📦 Current version: ${currentVersion}\n`);
+
+  // Prompt for version bump
+  const versionBump = await select({
+    message: "Bump version?",
+    choices: [
+      { name: "No bump (keep current version)", value: "none" },
+      {
+        name: `Patch (${currentVersion} → ${bumpVersion(
+          currentVersion,
+          "patch"
+        )})`,
+        value: "patch",
+      },
+      {
+        name: `Minor (${currentVersion} → ${bumpVersion(
+          currentVersion,
+          "minor"
+        )})`,
+        value: "minor",
+      },
+      {
+        name: `Major (${currentVersion} → ${bumpVersion(
+          currentVersion,
+          "major"
+        )})`,
+        value: "major",
+      },
+    ],
+  });
+
+  // Bump version if selected
+  if (versionBump !== "none") {
+    const bumpSuccess = await runCommand(
+      ["bun", "run", "scripts/version.ts", versionBump],
+      `📦 Bumping version (${versionBump})`
+    );
+
+    if (!bumpSuccess) {
+      console.error("\n❌ Version bump failed. Deployment aborted.");
+      process.exit(1);
+    }
+
+    // Get the new version
+    const newVersion = await getCurrentVersion();
+    console.log(`\n✅ Version updated to: ${newVersion}\n`);
+  } else {
+    console.log(`\n📦 Keeping current version: ${currentVersion}\n`);
+  }
 
   // Prompt for sample rate
   const sampleRateInput = await input({
