@@ -102,7 +102,7 @@ async function deploy() {
   // Prompt for sample rate
   const sampleRateInput = await input({
     message: "Enter sample rate (0-100):",
-    default: "10",
+    default: "100",
     validate: (value) => {
       const num = parseInt(value, 10);
       if (isNaN(num) || num < 0 || num > 100) {
