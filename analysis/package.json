@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "fetch-latest-events": "bun run queries/fetch-latest-events.ts",
-    "count-by-country": "bun run queries/count-by-country.ts"
+    "count-by-country": "bun run queries/count-by-country.ts",
+    "count-by-event-type": "bun run queries/count-by-event-type.ts",
+    "total-cpm-by-session": "bun run queries/total-cpm-by-session.ts",
+    "latency-vs-revenue-by-bidder": "bun run queries/latency-vs-revenue-by-bidder.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

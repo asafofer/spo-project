@@ -3,12 +3,20 @@ import { axiom } from "../src/axiom";
 async function runQuery() {
   const datasetName = process.env.AXIOM_DATASET || "prebid-events";
 
-  // Query to fetch the last 5 events with country info from IP address
+  // Parse CLI argument for limit, default to 5
+  const limit = process.argv[2] ? parseInt(process.argv[2], 10) : 5;
+
+  if (isNaN(limit) || limit < 1) {
+    console.error("Error: Limit must be a positive number");
+    process.exit(1);
+  }
+
+  // Query to fetch the last N events with country info from IP address
   // Using geo_info_from_ip_address to convert IP to country
   const query = `['${datasetName}'] 
     | extend geo = geo_info_from_ip_address(ip)
     | order by _time desc 
-    | limit 5`;
+    | limit ${limit}`;
 
   console.log(`Running query: ${query}`);
   console.log("---");
