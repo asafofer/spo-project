@@ -11,7 +11,7 @@ import type {
   PrebidEvent,
   PrebidEventType,
 } from "./types/prebidEvent.js";
-import { extractEventTimestamp } from "./utils.js";
+import { extractEventTimestamp, isSessionStorageAvailable } from "./utils.js";
 
 type PbjsInstance = {
   getEvents?: () => PastEvent[];
@@ -235,6 +235,12 @@ function registerLiveListeners(pbjsInstance: PbjsInstance): void {
  */
 function initCollector(): void {
   if (!isBrowser()) return;
+
+  // Check if sessionStorage is available - abort if not
+  if (!isSessionStorageAvailable()) {
+    logger.log("[Collector] Aborted due to sessionStorage not available");
+    return;
+  }
 
   // Check sampling decision - abort early if not sampling
   if (!getSamplingDecision()) {
