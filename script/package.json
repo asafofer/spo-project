@@ -7,6 +7,10 @@
     "build": "bun run scripts/build.ts",
     "watch": "bun run --watch scripts/build.ts",
     "serve": "bun run scripts/serve.ts",
+    "upload": "bun run scripts/upload.ts",
+    "deploy": "bun run scripts/deploy.ts",
+    "view-bucket": "bun run scripts/view-bucket.ts",
+    "purge-cache": "bun run scripts/purge-cache.ts",
     "version:patch": "bun run scripts/version.ts patch",
     "version:minor": "bun run scripts/version.ts minor",
     "version:major": "bun run scripts/version.ts major",
@@ -17,10 +21,15 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
+    "@inquirer/prompts": "^8.0.2",
     "@types/bun": "latest",
-    "happy-dom": "^15.0.0"
+    "happy-dom": "^15.0.0",
+    "wrangler": "^4.54.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.948.0"
   }
 }
