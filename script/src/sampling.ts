@@ -1,13 +1,8 @@
 // Sample rate (0-100) - will be replaced at build time via Bun's --define
-// Fallback to 100 for testing when BUILD_SAMPLE_RATE is not defined
+// Test fallback is provided via tests/setup.ts preload
 declare const BUILD_SAMPLE_RATE: number;
-const SAMPLE_RATE = (function() {
-  try {
-    return BUILD_SAMPLE_RATE;
-  } catch {
-    return 100; // Default for testing
-  }
-})();
+
+const SAMPLE_RATE = BUILD_SAMPLE_RATE;
 
 const samplingDecisionKey = "__sampling__"; // Session storage key for sampling decision
 let cachedSamplingDecision: boolean | undefined; // Cached decision for when sessionStorage is unavailable

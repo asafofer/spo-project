@@ -9,33 +9,15 @@ import { parseUserAgent } from "./uaParser.js";
 import { generateUUID, getSessionId } from "./utils.js";
 
 // Will be replaced at build time via Bun's --define
-// Fallbacks provided for testing when constants are not defined
+// Test fallbacks are provided via tests/setup.ts preload
 declare const BUILD_EVENTS_ENDPOINT_URL: string;
 declare const BUILD_IP_ENDPOINT_URL: string;
 declare const BUILD_VERSION: string;
 declare const BUILD_AXIOM_TOKEN: string;
 
-const EVENTS_ENDPOINT_URL = (function() {
-  try {
-    return BUILD_EVENTS_ENDPOINT_URL;
-  } catch {
-    return "http://localhost/test-events";
-  }
-})();
-const IP_ENDPOINT_URL = (function() {
-  try {
-    return BUILD_IP_ENDPOINT_URL;
-  } catch {
-    return "http://localhost/test-trace";
-  }
-})();
-const VERSION = (function() {
-  try {
-    return BUILD_VERSION;
-  } catch {
-    return "0.0.0-test";
-  }
-})();
+const EVENTS_ENDPOINT_URL = BUILD_EVENTS_ENDPOINT_URL;
+const IP_ENDPOINT_URL = BUILD_IP_ENDPOINT_URL;
+const VERSION = BUILD_VERSION;
 const MAX_RETRIES = 3;
 
 // Initialize common data (static per page load)
@@ -177,13 +159,7 @@ function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${(function() {
-        try {
-          return BUILD_AXIOM_TOKEN;
-        } catch {
-          return "test-token";
-        }
-      })()}`,
+      Authorization: `Bearer ${BUILD_AXIOM_TOKEN}`,
     },
     body: JSON.stringify(payload),
     keepalive: true, // Ensure request survives page unload
