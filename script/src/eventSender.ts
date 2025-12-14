@@ -1,16 +1,17 @@
 // Event sender module - handles IP fetching, enrichment, buffering, and sending
 
 import { logger } from "./logger.js";
+import type {
+  AnalyticsEvent,
+  AnalyticsEventData,
+} from "./types/analyticsEvent.js";
 import { parseUserAgent } from "./uaParser.js";
 import { generateUUID, getSessionId } from "./utils.js";
-import type {
-  AnalyticsEventData,
-  AnalyticsEvent,
-} from "./types/analyticsEvent.js";
 
-const EVENTS_ENDPOINT_URL =
-  "https://us-east-1.aws.edge.axiom.co/v1/ingest/prebid-events";
-const IP_ENDPOINT_URL = "https://cloudflare.com/cdn-cgi/trace";
+// Will be replaced at build time with AXIOM_URL + AXIOM_DATASET_EVENTS
+const EVENTS_ENDPOINT_URL = "__AXIOM_EVENTS_URL__";
+// Will be replaced at build time from CLOUDFLARE_TRACE_URL in .env
+const IP_ENDPOINT_URL = "__CLOUDFLARE_TRACE_URL__";
 const MAX_RETRIES = 3;
 const VERSION = "__VERSION__"; // Will be replaced at build time from package.json
 
