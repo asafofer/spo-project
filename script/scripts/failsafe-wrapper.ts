@@ -7,16 +7,31 @@
 declare const BUILD_AXIOM_URL: string;
 declare const BUILD_AXIOM_TOKEN: string;
 
+// This placeholder will be replaced by the actual bundle content during the build script
+declare const __BUNDLE_CONTENT__: void;
+
+interface AxiomErrorData {
+  _time: string;
+  message: string;
+  stack?: string;
+  url: string;
+  userAgent: string;
+  type: "runtime_error";
+}
+
 // Helper to report errors
-function reportRuntimeError(error: any) {
+function reportRuntimeError(error: unknown) {
   try {
     const url = BUILD_AXIOM_URL;
     const token = BUILD_AXIOM_TOKEN;
     
-    const data = {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    const data: AxiomErrorData = {
       _time: new Date().toISOString(),
-      message: error.message ? error.message : String(error),
-      stack: error.stack,
+      message: errorMessage,
+      stack: errorStack,
       url: window.location.href,
       userAgent: navigator.userAgent,
       type: "runtime_error"
@@ -50,7 +65,6 @@ function reportRuntimeError(error: any) {
 try {
   // The __BUNDLE_CONTENT__ line is replaced by the actual code.
   // Since the bundle is an IIFE, it executes immediately here.
-  // @ts-ignore
   __BUNDLE_CONTENT__;
 } catch (error) {
   reportRuntimeError(error);
