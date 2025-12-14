@@ -1,11 +1,9 @@
 import { join } from "node:path";
-import { loadEnv } from "./loadEnv.ts";
 import { processPostBuild } from "./postBuild.ts";
 
-// Load environment variables manually to ensure they are available
+// Bun automatically loads .env files, so no manual loading needed
 const scriptDir = import.meta.dir;
 const rootDir = join(scriptDir, "..");
-await loadEnv(rootDir);
 
 // Read package.json to get version
 const packageJsonPath = join(rootDir, "package.json");
@@ -28,6 +26,33 @@ if (isNaN(sampleRate) || sampleRate < 0 || sampleRate > 100) {
   );
 }
 
+// Load environment variables for build-time constants
+const axiomToken = process.env.AXIOM_TOKEN;
+const axiomUrl = process.env.AXIOM_URL;
+const axiomDatasetErrors = process.env.AXIOM_DATASET_ERRORS;
+const axiomDatasetEvents = process.env.AXIOM_DATASET_EVENTS;
+const cloudflareTraceUrl = process.env.CLOUDFLARE_TRACE_URL;
+
+// Require configuration
+if (!axiomToken) {
+  throw new Error("AXIOM_TOKEN is required in .env file");
+}
+if (!axiomUrl) {
+  throw new Error("AXIOM_URL is required in .env file");
+}
+if (!axiomDatasetErrors) {
+  throw new Error("AXIOM_DATASET_ERRORS is required in .env file");
+}
+if (!axiomDatasetEvents) {
+  throw new Error("AXIOM_DATASET_EVENTS is required in .env file");
+}
+if (!cloudflareTraceUrl) {
+  throw new Error("CLOUDFLARE_TRACE_URL is required in .env file");
+}
+
+// Construct full URLs
+const eventsUrl = `${axiomUrl}/${axiomDatasetEvents}`;
+
 const result = await Bun.build({
   entrypoints: [join(rootDir, "src", "collector.ts")],
   outdir: join(rootDir, "dist"),
@@ -36,9 +61,13 @@ const result = await Bun.build({
   format: "iife", // Output as IIFE to avoid module exports
   minify: true, // Minify for production
   sourcemap: "external", // Useful for debugging
-  // Note: __VERSION__ and __SAMPLE_RATE__ are handled via manual replacement
-  // because they appear as string literals in source, not identifiers
-  // define only works on identifiers, not string literals
+  define: {
+    "BUILD_VERSION": JSON.stringify(version),
+    "BUILD_SAMPLE_RATE": sampleRate.toString(),
+    "BUILD_EVENTS_ENDPOINT_URL": JSON.stringify(eventsUrl),
+    "BUILD_IP_ENDPOINT_URL": JSON.stringify(cloudflareTraceUrl),
+    "BUILD_AXIOM_TOKEN": JSON.stringify(axiomToken),
+  },
 });
 
 if (!result.success) {
@@ -50,11 +79,14 @@ if (!result.success) {
   const outputPath = join(rootDir, "dist", "collector.prod.js");
   const outputContent = await Bun.file(outputPath).text();
 
+  // Construct errors URL for fail-safe wrapper
+  const errorsUrl = `${axiomUrl}/${axiomDatasetErrors}`;
+
   await processPostBuild({
     outputPath,
     bundleContent: outputContent,
-    version,
-    sampleRate,
     scriptDir,
+    axiomToken,
+    errorsUrl,
   });
 }

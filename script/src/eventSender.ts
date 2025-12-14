@@ -8,12 +8,35 @@ import type {
 import { parseUserAgent } from "./uaParser.js";
 import { generateUUID, getSessionId } from "./utils.js";
 
-// Will be replaced at build time with AXIOM_URL + AXIOM_DATASET_EVENTS
-const EVENTS_ENDPOINT_URL = "__AXIOM_EVENTS_URL__";
-// Will be replaced at build time from CLOUDFLARE_TRACE_URL in .env
-const IP_ENDPOINT_URL = "__CLOUDFLARE_TRACE_URL__";
+// Will be replaced at build time via Bun's --define
+// Fallbacks provided for testing when constants are not defined
+declare const BUILD_EVENTS_ENDPOINT_URL: string;
+declare const BUILD_IP_ENDPOINT_URL: string;
+declare const BUILD_VERSION: string;
+declare const BUILD_AXIOM_TOKEN: string;
+
+const EVENTS_ENDPOINT_URL = (function() {
+  try {
+    return BUILD_EVENTS_ENDPOINT_URL;
+  } catch {
+    return "http://localhost/test-events";
+  }
+})();
+const IP_ENDPOINT_URL = (function() {
+  try {
+    return BUILD_IP_ENDPOINT_URL;
+  } catch {
+    return "http://localhost/test-trace";
+  }
+})();
+const VERSION = (function() {
+  try {
+    return BUILD_VERSION;
+  } catch {
+    return "0.0.0-test";
+  }
+})();
 const MAX_RETRIES = 3;
-const VERSION = "__VERSION__"; // Will be replaced at build time from package.json
 
 // Initialize common data (static per page load)
 const pageviewId = generateUUID();
@@ -154,7 +177,13 @@ function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: "Bearer xaat-bcfddc63-166c-468e-ad14-1872c4f0c3fb",
+      Authorization: `Bearer ${(function() {
+        try {
+          return BUILD_AXIOM_TOKEN;
+        } catch {
+          return "test-token";
+        }
+      })()}`,
     },
     body: JSON.stringify(payload),
     keepalive: true, // Ensure request survives page unload

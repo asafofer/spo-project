@@ -1,32 +1,26 @@
-// Sample rate (0-100) - will be replaced at build time, default 100%
-// At build time, "__SAMPLE_RATE__" is replaced with a number literal
-const SAMPLE_RATE = "__SAMPLE_RATE__";
+// Sample rate (0-100) - will be replaced at build time via Bun's --define
+// Fallback to 100 for testing when BUILD_SAMPLE_RATE is not defined
+declare const BUILD_SAMPLE_RATE: number;
+const SAMPLE_RATE = (function() {
+  try {
+    return BUILD_SAMPLE_RATE;
+  } catch {
+    return 100; // Default for testing
+  }
+})();
 
 const samplingDecisionKey = "__sampling__"; // Session storage key for sampling decision
 let cachedSamplingDecision: boolean | undefined; // Cached decision for when sessionStorage is unavailable
 
 /**
- * Parse the sample rate from the build-time constant
- * Handles both number (after build) and string (before build or if replacement failed)
+ * Get the sample rate from the build-time constant
  * @param overrideRate - Optional rate to use for testing (overrides SAMPLE_RATE constant)
  */
 export function getSampleRate(overrideRate?: number): number {
   if (overrideRate !== undefined) {
     return overrideRate;
   }
-
-  if (typeof SAMPLE_RATE === "number") {
-    return SAMPLE_RATE;
-  }
-  if (
-    typeof SAMPLE_RATE === "string" &&
-    SAMPLE_RATE !== "__SAMPLE_RATE__"
-  ) {
-    const parsed = parseInt(SAMPLE_RATE, 10);
-    return isNaN(parsed) ? 100 : parsed;
-  }
-  // Default to 100% if not replaced at build time
-  return 100;
+  return SAMPLE_RATE;
 }
 
 /**

@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { loadEnv } from "./loadEnv.ts";
 
 const PORT = 3000;
 
@@ -13,7 +12,7 @@ const rootDir = join(scriptDir, "..");
 
 if (isProd) {
   // Production mode: load script from PROD_DOMAIN
-  await loadEnv(rootDir);
+  // Bun automatically loads .env files
   
   const prodDomain = process.env.PROD_DOMAIN;
   if (!prodDomain) {
