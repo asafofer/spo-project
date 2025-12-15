@@ -271,7 +271,7 @@ function initCollector(): void {
     const doc = (globalThis as any).document;
     doc.addEventListener("visibilitychange", () => {
       if (doc.visibilityState === "hidden") {
-        flush();
+        flush(true);
       }
     });
   }
