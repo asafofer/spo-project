@@ -1,10 +1,10 @@
 // Event sender module - handles IP fetching, enrichment, buffering, and sending
 
-import { logger } from "./logger.js";
 import type {
   AnalyticsEvent,
   AnalyticsEventData,
-} from "./types/analyticsEvent.js";
+} from "../types/analyticsEvent.js";
+import { logger } from "./logger.js";
 import { parseUserAgent } from "./uaParser.js";
 import { generateUUID, getSessionId } from "./utils.js";
 

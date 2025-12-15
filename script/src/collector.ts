@@ -1,6 +1,3 @@
-import { addEvents, flush, markAuctionCompleted } from "./eventSender.js";
-import { logger } from "./logger.js";
-import { getSampleRate, getSamplingDecision } from "./sampling.js";
 import type {
   AnalyticsEventData,
   BaseAnalyticsEvent,
@@ -11,7 +8,10 @@ import type {
   PrebidEvent,
   PrebidEventType,
 } from "./types/prebidEvent.js";
-import { extractEventTimestamp, isSessionStorageAvailable } from "./utils.js";
+import { addEvents, flush, markAuctionCompleted } from "./utils/eventSender.js";
+import { logger } from "./utils/logger.js";
+import { getSampleRate, getSamplingDecision } from "./utils/sampling.js";
+import { extractEventTimestamp, isSessionStorageAvailable } from "./utils/utils.js";
 
 type PbjsInstance = {
   getEvents?: () => PastEvent[];

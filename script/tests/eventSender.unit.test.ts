@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { addEvents, markAuctionCompleted } from "../src/eventSender.js";
 import type { AnalyticsEventData } from "../src/types/analyticsEvent.js";
+import { addEvents, markAuctionCompleted } from "../src/utils/eventSender.js";
 
 describe("EventSender Unit Tests", () => {
   beforeEach(() => {

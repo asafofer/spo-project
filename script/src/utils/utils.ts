@@ -1,4 +1,4 @@
-import type { Bid, PrebidEvent, PrebidEventType } from "./types/prebidEvent.js";
+import type { Bid, PrebidEvent, PrebidEventType } from "../types/prebidEvent.js";
 
 const sessionKey = "__sid__"; // Session storage key (don't collide with other scripts)
 let cachedSessionId: string | undefined; // Cached session ID for when sessionStorage is unavailable

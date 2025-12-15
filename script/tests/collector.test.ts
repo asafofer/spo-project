@@ -7,7 +7,7 @@ import mockEvents from "./data/mockEvents.json";
 // Mock dependencies
 const addEventsSpy = mock();
 
-mock.module("../src/eventSender.js", () => ({
+mock.module("../src/utils/eventSender.js", () => ({
   addEvents: addEventsSpy,
   flush: mock(),
   markAuctionCompleted: mock(),

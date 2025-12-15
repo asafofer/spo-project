@@ -6,7 +6,7 @@ import type { Bid } from "../src/types/prebidEvent.js";
 // Mock dependencies
 const addEventsSpy = mock();
 
-mock.module("../src/eventSender.js", () => ({
+mock.module("../src/utils/eventSender.js", () => ({
   addEvents: addEventsSpy,
   flush: mock(),
   markAuctionCompleted: mock(),
@@ -93,7 +93,7 @@ describe("Error Handling & Edge Cases", () => {
 
       // Import utils - should use cached ID fallback
       await expect(
-        import("../src/utils.js")
+        import("../src/utils/utils.js")
       ).resolves.toBeDefined();
 
       // Restore
@@ -114,7 +114,7 @@ describe("Error Handling & Edge Cases", () => {
       (globalThis as any).sessionStorage = mockSessionStorage;
 
       // Should use cached fallback
-      const { getSessionId } = await import("../src/utils.js");
+      const { getSessionId } = await import("../src/utils/utils.js");
       expect(() => {
         getSessionId();
       }).not.toThrow();
@@ -130,8 +130,8 @@ describe("Error Handling & Edge Cases", () => {
       await expect(
         Promise.all([
           import("../src/collector.js"),
-          import("../src/eventSender.js"),
-          import("../src/logger.js"),
+          import("../src/utils/eventSender.js"),
+          import("../src/utils/logger.js"),
         ])
       ).resolves.toBeDefined();
 
@@ -158,7 +158,7 @@ describe("Error Handling & Edge Cases", () => {
 
       // Should not throw
       await expect(
-        import("../src/eventSender.js")
+        import("../src/utils/eventSender.js")
       ).resolves.toBeDefined();
 
       // Restore
@@ -174,7 +174,7 @@ describe("Error Handling & Edge Cases", () => {
         Promise.reject(new Error("Network error"))
       ) as any;
 
-      const { flush, addEvents } = await import("../src/eventSender.js");
+      const { flush, addEvents } = await import("../src/utils/eventSender.js");
 
       addEvents([
         {

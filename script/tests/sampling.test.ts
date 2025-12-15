@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { getSampleRate, getSamplingDecision } from "../src/sampling.js";
+import { getSampleRate, getSamplingDecision } from "../src/utils/sampling.js";
 
 describe("Sampling Module", () => {
   let happyWindow: Window;

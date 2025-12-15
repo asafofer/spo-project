@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
 
 // Mock eventSender to prevent actual network calls
-mock.module("../src/eventSender.js", () => ({
+mock.module("../src/utils/eventSender.js", () => ({
   addEvents: mock(),
   flush: mock(),
   markAuctionCompleted: mock(),
@@ -89,7 +89,7 @@ describe("Initialization Tests", () => {
     test("does not crash when navigator is undefined", async () => {
       // Import eventSender - should not throw due to guard
       await expect(
-        import("../src/eventSender.js")
+        import("../src/utils/eventSender.js")
       ).resolves.toBeDefined();
     });
 
@@ -101,7 +101,7 @@ describe("Initialization Tests", () => {
       (globalThis as any).navigator = mockNavigator;
 
       // Import eventSender - it will initialize and parse the user agent
-      await import("../src/eventSender.js");
+      await import("../src/utils/eventSender.js");
 
       // Should not throw - the module should handle the user agent parsing
       expect(true).toBe(true);
@@ -112,7 +112,7 @@ describe("Initialization Tests", () => {
     test("does not crash when window is undefined", async () => {
       // Import logger - should not throw due to guard
       await expect(
-        import("../src/logger.js")
+        import("../src/utils/logger.js")
       ).resolves.toBeDefined();
     });
 
@@ -122,7 +122,7 @@ describe("Initialization Tests", () => {
       (globalThis as any).window = win;
 
       // Import logger
-      const { logger } = await import("../src/logger.js");
+      const { logger } = await import("../src/utils/logger.js");
 
       // Logger should be callable
       expect(() => {

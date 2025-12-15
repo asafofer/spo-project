@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { Bid, PrebidEvent } from "../src/types/prebidEvent.js";
-import { extractEventTimestamp, generateUUID, getSessionId } from "../src/utils.js";
+import { extractEventTimestamp, generateUUID, getSessionId } from "../src/utils/utils.js";
 
 describe("Utils Module", () => {
   let happyWindow: Window;

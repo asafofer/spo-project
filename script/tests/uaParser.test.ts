@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseUserAgent } from "../src/uaParser.js";
+import { parseUserAgent } from "../src/utils/uaParser.js";
 import { browsers } from "./data/browsers.js";
 import { os } from "./data/os.js";
 

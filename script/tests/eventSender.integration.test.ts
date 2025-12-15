@@ -5,14 +5,14 @@ import type { AnalyticsEventData } from "../src/types/analyticsEvent.js";
 // CRITICAL: Restore the real eventSender module at the top level BEFORE any tests run
 // Other test files mock this module, and those mocks persist. We need to explicitly
 // restore it to use the real implementation for integration tests.
-const realEventSenderModule = await import("../src/eventSender.js");
-mock.module("../src/eventSender.js", () => realEventSenderModule);
+const realEventSenderModule = await import("../src/utils/eventSender.js");
+mock.module("../src/utils/eventSender.js", () => realEventSenderModule);
 
 describe("EventSender Integration Tests", () => {
   let happyWindow: Window;
   let fetchSpy: ReturnType<typeof mock>;
   let originalFetch: typeof globalThis.fetch;
-  let eventSender: typeof import("../src/eventSender.js");
+  let eventSender: typeof import("../src/utils/eventSender.js");
 
   beforeEach(async () => {
     // Setup performance API before creating Window (happy-dom needs it)
@@ -27,11 +27,11 @@ describe("EventSender Integration Tests", () => {
     // CRITICAL: Dynamically import the real module in beforeEach to bypass module mocks
     // Other test files mock this module at the top level, and those mocks persist.
     // By using dynamic imports here, we ensure we get the real implementation.
-    eventSender = await import("../src/eventSender.js");
+    eventSender = await import("../src/utils/eventSender.js");
 
     // Restore the module mock to use the real implementation
     // This must happen in beforeEach to override mocks from other test files
-    mock.module("../src/eventSender.js", () => realEventSenderModule);
+    mock.module("../src/utils/eventSender.js", () => realEventSenderModule);
 
     // Reset eventSender state
     eventSender.resetEventSender();
