@@ -1,66 +1,144 @@
 import { join } from "node:path";
+import { unlink } from "node:fs/promises";
+import { parseArgs } from "node:util";
 
-// Read package.json to get version
-const packageJsonPath = join(import.meta.dir, "..", "package.json");
-const packageJson = await Bun.file(packageJsonPath).json();
-const version = packageJson.version || "1.0.0";
+// --- Configuration ---
+const PLACEHOLDER = "__BUNDLE_CONTENT__;";
 
-// Get sample rate from command-line argument or default to 100 (100%)
-// Usage: bun run scripts/build.ts --sample-rate=50
-const args = process.argv.slice(2);
-const sampleRateArg = args.find((arg) => arg.startsWith("--sample-rate="));
-const sampleRateValue = sampleRateArg?.split("=")[1];
-const sampleRate = sampleRateValue
-  ? parseInt(sampleRateValue, 10)
-  : 100;
+// Type-safe environment variable validation
+const env = process.env;
 
-// Validate sample rate
-if (isNaN(sampleRate) || sampleRate < 0 || sampleRate > 100) {
-  throw new Error(
-    `Invalid --sample-rate: ${sampleRateValue ?? "undefined"}. Must be a number between 0 and 100.`
-  );
+// Validate environment variables only when running as main script
+// When imported by tests, these might not be set/needed immediately
+if (import.meta.main) {
+  if (!env.AXIOM_TOKEN) throw new Error("Missing AXIOM_TOKEN");
+  if (!env.AXIOM_URL) throw new Error("Missing AXIOM_URL");
+  if (!env.AXIOM_DATASET_ERRORS) throw new Error("Missing AXIOM_DATASET_ERRORS");
+  if (!env.AXIOM_DATASET_EVENTS) throw new Error("Missing AXIOM_DATASET_EVENTS");
+  if (!env.CLOUDFLARE_TRACE_URL) throw new Error("Missing CLOUDFLARE_TRACE_URL");
 }
 
-const scriptDir = import.meta.dir;
-const rootDir = join(scriptDir, "..");
+// Now TS knows these are strings
+const AXIOM_TOKEN = env.AXIOM_TOKEN!;
+const AXIOM_URL = env.AXIOM_URL!;
+const AXIOM_DATASET_ERRORS = env.AXIOM_DATASET_ERRORS!;
+const AXIOM_DATASET_EVENTS = env.AXIOM_DATASET_EVENTS!;
+const CLOUDFLARE_TRACE_URL = env.CLOUDFLARE_TRACE_URL!;
 
-const result = await Bun.build({
-  entrypoints: [join(rootDir, "src", "collector.ts")],
-  outdir: join(rootDir, "dist"),
-  naming: "collector.prod.js", // Force specific output name
-  target: "browser",
-  format: "iife", // Output as IIFE to avoid module exports
-  minify: true, // Minify for production
-  sourcemap: "external", // Useful for debugging
-  // Define constants at build time
-  define: {
-    __VERSION__: version,
-    // Note: __SAMPLE_RATE__ is handled via manual replacement to ensure it's a number literal
-  },
-});
-
-if (!result.success) {
-  console.error("Build failed");
-  for (const message of result.logs) {
-    console.error(message);
+export async function wrapAndBuild(
+  innerContent: string,
+  axiomUrl: string,
+  axiomToken: string,
+  minify = true,
+  outputFile = "collector.prod.js"
+) {
+  // Fix: Resolve path relative to this script to work from any CWD
+  const wrapperPath = join(import.meta.dir, "..", "src", "utils", "failsafe-wrapper.ts");
+  
+  if (!(await Bun.file(wrapperPath).exists())) {
+    throw new Error(`Wrapper file not found at ${wrapperPath}`);
   }
-} else {
-  // Replace version placeholder in the built file (fallback if define doesn't work)
-  // Replace __VERSION__ with just the version string (no quotes) since source already has quotes
-  const outputPath = join(rootDir, "dist", "collector.prod.js");
-  const outputContent = await Bun.file(outputPath).text();
-  // Replace __VERSION__ (without quotes) with version string (without quotes)
-  // This way: const VERSION = "__VERSION__" becomes const VERSION = "1.0.0"
-  // Replace __SAMPLE_RATE__ with sample rate number (no quotes, as number literal)
-  // This way: const SAMPLE_RATE = "__SAMPLE_RATE__" becomes const SAMPLE_RATE = 100
-  let updatedContent = outputContent.replace(/__VERSION__/g, version);
-  // Replace __SAMPLE_RATE__ with the numeric value (no quotes for number literal)
-  updatedContent = updatedContent.replace(
-    /"__SAMPLE_RATE__"/g,
-    sampleRate.toString()
-  );
-  await Bun.write(outputPath, updatedContent);
 
-  console.log(`Build successful! Version: ${version}, Sample Rate: ${sampleRate}%`);
-  console.log("Output: script/dist/collector.prod.js");
+  const wrapperContent = await Bun.file(wrapperPath).text();
+
+  // This check is CRITICAL because .replace() fails silently
+  if (!wrapperContent.includes(PLACEHOLDER)) {
+    throw new Error(`Template missing placeholder: "${PLACEHOLDER}"`);
+  }
+
+  const wrappedContent = wrapperContent.replace(PLACEHOLDER, innerContent);
+  const tempWrapperPath = "dist/collector.wrapper.ts";
+  await Bun.write(tempWrapperPath, wrappedContent);
+
+  const buildResult = await Bun.build({
+    entrypoints: [tempWrapperPath],
+    outdir: "dist",
+    naming: outputFile,
+    target: "browser",
+    format: "iife",
+    minify: minify,
+    sourcemap: "external",
+    define: {
+      "BUILD_AXIOM_URL": JSON.stringify(axiomUrl),
+      "BUILD_AXIOM_TOKEN": JSON.stringify(axiomToken),
+    },
+  });
+
+  if (!buildResult.success) {
+    console.error("Failsafe wrapper build failed:\n", buildResult.logs.join("\n"));
+    throw new Error("Build failed");
+  }
+
+  // Cleanup temp file
+  await unlink(tempWrapperPath).catch(() => {});
+
+  return buildResult;
+}
+
+async function main() {
+  // --- 1. Setup & Validation ---
+  const { values: args } = parseArgs({
+    args: Bun.argv,
+    options: {
+      "sample-rate": { type: "string", default: "100" },
+    },
+    strict: true,
+    allowPositionals: true,
+  });
+
+  const sampleRate = parseInt(args["sample-rate"]!, 10);
+  if (isNaN(sampleRate) || sampleRate < 0 || sampleRate > 100) {
+    throw new Error(`Invalid sample-rate: ${sampleRate}. Must be 0-100.`);
+  }
+
+  // Environment variables are already validated globally at the top of the file
+  
+  const packageJson = await Bun.file("package.json").json();
+  const version = packageJson.version || "1.0.0";
+  const eventsUrl = `${AXIOM_URL}/${AXIOM_DATASET_EVENTS}`;
+  const cloudflareTraceUrl = CLOUDFLARE_TRACE_URL;
+
+  console.log(`Building collector (v${version}, sample rate: ${sampleRate}%)`);
+
+  // --- 2. Build Inner Collector ---
+  const innerBuildResult = await Bun.build({
+    entrypoints: ["src/collector.ts"], // Bun resolves paths relative to cwd automatically
+    outdir: "dist",
+    naming: "collector.inner.js",
+    target: "browser",
+    format: "iife",
+    define: {
+      "BUILD_VERSION": JSON.stringify(version),
+      "BUILD_SAMPLE_RATE": sampleRate.toString(),
+      "BUILD_EVENTS_ENDPOINT_URL": JSON.stringify(eventsUrl),
+      "BUILD_IP_ENDPOINT_URL": JSON.stringify(cloudflareTraceUrl),
+      "BUILD_AXIOM_TOKEN": JSON.stringify(AXIOM_TOKEN),
+    },
+  });
+
+  if (!innerBuildResult.success) {
+    console.error("Inner build failed:\n", innerBuildResult.logs.join("\n"));
+    process.exit(1);
+  }
+
+  // --- 3. Inject into Wrapper & Final Build ---
+  const innerContent = await Bun.file("dist/collector.inner.js").text();
+  const axiomErrorsUrl = `${AXIOM_URL}/${AXIOM_DATASET_ERRORS}`;
+  
+  await wrapAndBuild(
+    innerContent, 
+    axiomErrorsUrl, 
+    AXIOM_TOKEN, 
+    true, 
+    "collector.prod.js"
+  );
+
+  // Cleanup inner collector
+  await unlink("dist/collector.inner.js").catch(() => {});
+
+  console.log("✅ Build successful -> script/dist/collector.prod.js");
+}
+
+if (import.meta.main) {
+  await main();
 }

@@ -1,18 +1,24 @@
 // Event sender module - handles IP fetching, enrichment, buffering, and sending
 
+import type {
+  AnalyticsEvent,
+  AnalyticsEventData,
+} from "../types/analyticsEvent.js";
 import { logger } from "./logger.js";
 import { parseUserAgent } from "./uaParser.js";
 import { generateUUID, getSessionId } from "./utils.js";
-import type {
-  AnalyticsEventData,
-  AnalyticsEvent,
-} from "./types/analyticsEvent.js";
 
-const EVENTS_ENDPOINT_URL =
-  "https://us-east-1.aws.edge.axiom.co/v1/ingest/prebid-events";
-const IP_ENDPOINT_URL = "https://cloudflare.com/cdn-cgi/trace";
+// Will be replaced at build time via Bun's --define
+// Test fallbacks are provided via tests/setup.ts preload
+declare const BUILD_EVENTS_ENDPOINT_URL: string;
+declare const BUILD_IP_ENDPOINT_URL: string;
+declare const BUILD_VERSION: string;
+declare const BUILD_AXIOM_TOKEN: string;
+
+const EVENTS_ENDPOINT_URL = BUILD_EVENTS_ENDPOINT_URL;
+const IP_ENDPOINT_URL = BUILD_IP_ENDPOINT_URL;
+const VERSION = BUILD_VERSION;
 const MAX_RETRIES = 3;
-const VERSION = "__VERSION__"; // Will be replaced at build time from package.json
 
 // Initialize common data (static per page load)
 const pageviewId = generateUUID();
@@ -153,7 +159,7 @@ function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: "Bearer xaat-bcfddc63-166c-468e-ad14-1872c4f0c3fb",
+      Authorization: `Bearer ${BUILD_AXIOM_TOKEN}`,
     },
     body: JSON.stringify(payload),
     keepalive: true, // Ensure request survives page unload

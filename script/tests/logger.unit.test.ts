@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { Window } from "happy-dom";
-import { logger } from "../src/logger.js";
+import { logger } from "../src/utils/logger.js";
 
 describe("Logger Module", () => {
   let happyWindow: Window;

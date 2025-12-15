@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
 import {
-    handleBidRequested,
-    handleBidResponse,
+  handleBidRequested,
+  handleBidResponse,
 } from "../src/collector.js";
 import type { Bid, PastEvent } from "../src/types/prebidEvent.js";
 import mockEvents from "./data/mockEvents.json";
@@ -10,7 +10,7 @@ import mockEvents from "./data/mockEvents.json";
 // Mock dependencies
 const addEventsSpy = mock();
 
-mock.module("../src/eventSender.js", () => ({
+mock.module("../src/utils/eventSender.js", () => ({
   addEvents: addEventsSpy,
   flush: mock(),
   markAuctionCompleted: mock(),

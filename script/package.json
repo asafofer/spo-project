@@ -1,12 +1,13 @@
 {
   "name": "prebid-collector-script",
-  "version": "1.0.10",
+  "version": "1.0.13",
   "module": "src/collector.js",
   "type": "module",
   "scripts": {
     "build": "bun run scripts/build.ts",
     "watch": "bun run --watch scripts/build.ts",
     "serve": "bun run scripts/serve.ts",
+    "serve-prod": "bun run scripts/serve.ts prod",
     "upload": "bun run scripts/upload.ts",
     "deploy": "bun run scripts/deploy.ts",
     "view-bucket": "bun run scripts/view-bucket.ts",
