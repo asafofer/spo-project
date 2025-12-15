@@ -154,7 +154,7 @@ export function markAuctionCompleted(auctionId: string): void {
 /**
  * Send payload with retry logic
  */
-function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
+function sendPayload(payload: AnalyticsEvent[], retryCount = 0, keepalive = false): void {
   fetch(EVENTS_ENDPOINT_URL, {
     method: "POST",
     headers: {
@@ -162,12 +162,12 @@ function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
       Authorization: `Bearer ${BUILD_AXIOM_TOKEN}`,
     },
     body: JSON.stringify(payload),
-    keepalive: true, // Ensure request survives page unload
+    keepalive: keepalive, // Ensure request survives page unload if set
   }).catch((err) => {
     if (retryCount < MAX_RETRIES) {
       const nextRetry = retryCount + 1;
       logger.warn(`[EventSender] Retry ${nextRetry}/${MAX_RETRIES}`);
-      setTimeout(() => sendPayload(payload, nextRetry), 500);
+      setTimeout(() => sendPayload(payload, nextRetry, keepalive), 500);
     } else {
       logger.error("[EventSender] Send failed after retries:", err);
     }
@@ -177,7 +177,7 @@ function sendPayload(payload: AnalyticsEvent[], retryCount = 0): void {
 /**
  * Flush all queued events - waits for IP to be fetched before sending
  */
-export async function flush(): Promise<void> {
+export async function flush(keepalive = false): Promise<void> {
   if (eventQueue.length === 0) return;
 
   // Check if we need to fetch IP (only if yotoApp.country doesn't exist)
@@ -201,7 +201,7 @@ export async function flush(): Promise<void> {
   const payload = [...enrichedEvents];
   eventQueue = [];
   // Send the enriched payload
-  sendPayload(payload, 0);
+  sendPayload(payload, 0, keepalive);
   logger.log(`[EventSender] Flushed ${payload.length} event(s)`);
 }
 

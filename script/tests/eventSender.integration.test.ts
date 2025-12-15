@@ -34,7 +34,22 @@ describe("EventSender Integration Tests", () => {
     mock.module("../src/utils/eventSender.js", () => realEventSenderModule);
 
     // Reset eventSender state
-    eventSender.resetEventSender();
+    // Note: resetEventSender is internal and not exported in production builds
+    // so we access it via the imported module which exposes internal functions for testing
+    // @ts-ignore
+    if (typeof eventSender.resetEventSender === 'function') {
+        // @ts-ignore
+        eventSender.resetEventSender();
+    } else {
+        // Fallback: manually clear the queue if possible or re-import
+        // Since we are re-importing in beforeEach, the state should be fresh anyway
+        // but we need to ensure the module is re-evaluated.
+        // Dynamic import with cache busting query param would ensure freshness:
+        eventSender = await import(`../src/utils/eventSender.js?t=${Date.now()}`);
+        
+        // Restore mock for the new module instance
+        mock.module("../src/utils/eventSender.js", () => realEventSenderModule);
+    }
 
     // Fresh environment for every test
     happyWindow = new Window();
