@@ -6,7 +6,7 @@ import type {
 } from "../types/analyticsEvent.js";
 import { logger } from "./logger.js";
 import { parseUserAgent } from "./uaParser.js";
-import { generateUUID, getSessionId } from "./utils.js";
+import { generateUUID, getSessionId, getCustomerId } from "./utils.js";
 
 // Will be replaced at build time via Bun's --define
 // Test fallbacks are provided via tests/setup.ts preload
@@ -103,6 +103,7 @@ async function getCommonData(): Promise<{
   ip: string | null;
   yotoCountry: string | null;
   version: string;
+  customerId: string | null;
 }> {
   const win = isBrowser() ? (window as any) : null;
   const yotoCountry = win?.yotoApp?.country;
@@ -124,6 +125,7 @@ async function getCommonData(): Promise<{
     ip: ip,
     yotoCountry: yotoCountry || null,
     version: VERSION,
+    customerId: getCustomerId(),
   };
 }
 
@@ -154,7 +156,11 @@ export function markAuctionCompleted(auctionId: string): void {
 /**
  * Send payload with retry logic
  */
-function sendPayload(payload: AnalyticsEvent[], retryCount = 0, keepalive = false): void {
+function sendPayload(
+  payload: AnalyticsEvent[],
+  retryCount = 0,
+  keepalive = false
+): void {
   fetch(EVENTS_ENDPOINT_URL, {
     method: "POST",
     headers: {
