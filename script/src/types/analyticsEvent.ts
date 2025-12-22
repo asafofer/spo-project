@@ -49,4 +49,5 @@ export type AnalyticsEvent = AnalyticsEventData & {
   ip: string | null;
   yotoCountry: string | null;
   version: string;
+  customerId: string | null;
 };

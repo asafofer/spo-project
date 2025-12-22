@@ -1,7 +1,19 @@
-import type { Bid, PrebidEvent, PrebidEventType } from "../types/prebidEvent.js";
+import type {
+  Bid,
+  PrebidEvent,
+  PrebidEventType,
+} from "../types/prebidEvent.js";
 
 const sessionKey = "__sid__"; // Session storage key (don't collide with other scripts)
 let cachedSessionId: string | undefined; // Cached session ID for when sessionStorage is unavailable
+
+// Capture customer ID from document.currentScript during script execution
+// document.currentScript is only available synchronously during script execution
+let cachedCustomerId: string | null = null;
+if (typeof document !== "undefined" && (document as any).currentScript) {
+  const currentScript = (document as any).currentScript as HTMLScriptElement;
+  cachedCustomerId = currentScript?.dataset?.cid || null;
+}
 
 /**
  * Generate a UUID v4
@@ -77,6 +89,15 @@ export function getSessionId(): string {
 }
 
 /**
+ * Get customer ID from the script tag's data-cid attribute
+ * Uses document.currentScript captured during initialization
+ * Returns null if not found or not in browser environment
+ */
+export function getCustomerId(): string | null {
+  return cachedCustomerId;
+}
+
+/**
  * Extract the actual event timestamp from Prebid event data
  * Returns the timestamp when the event actually happened on the client side
  */
@@ -117,7 +138,10 @@ export function extractEventTimestamp(
     case "bidRequested": {
       // start is on bidderRequest (parent), not on individual bids
       // For bidRequested, eventData is the parent bidderRequest object
-      const bidderRequest = eventData as Extract<PrebidEvent, { start?: number }>;
+      const bidderRequest = eventData as Extract<
+        PrebidEvent,
+        { start?: number }
+      >;
       if (bidderRequest.start && typeof bidderRequest.start === "number") {
         return bidderRequest.start;
       }
