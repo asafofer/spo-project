@@ -11,7 +11,10 @@ import type {
 import { addEvents, flush, markAuctionCompleted } from "./utils/eventSender.js";
 import { logger } from "./utils/logger.js";
 import { getSampleRate, getSamplingDecision } from "./utils/sampling.js";
-import { extractEventTimestamp, isSessionStorageAvailable } from "./utils/utils.js";
+import {
+  extractEventTimestamp,
+  isSessionStorageAvailable,
+} from "./utils/utils.js";
 
 type PbjsInstance = {
   getEvents?: () => PastEvent[];
@@ -27,7 +30,6 @@ type PbjsInstance = {
 function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
-
 
 // Normalize bid fields across different event types
 export function getBidData(
@@ -67,7 +69,11 @@ export function handleBidRequested(
   elapsedTime?: number
 ): void {
   // Extract timestamp from bidderRequest (parent) - all bids share the same start time
-  const eventTimestamp = extractEventTimestamp("bidRequested", data, elapsedTime);
+  const eventTimestamp = extractEventTimestamp(
+    "bidRequested",
+    data,
+    elapsedTime
+  );
   const events: AnalyticsEventData[] = (data.bids || [])
     .filter((bid) => bid != null) // Filter out null/undefined bids
     .map((bid) => ({
@@ -82,12 +88,13 @@ export function handleBidRequested(
   queueEvents(events);
 }
 
-function handleBidTimeout(
-  bids: Bid[] | undefined,
-  elapsedTime?: number
-): void {
+function handleBidTimeout(bids: Bid[] | undefined, elapsedTime?: number): void {
   const events: AnalyticsEventData[] = (bids || []).map((bid) => {
-    const eventTimestamp = extractEventTimestamp("bidTimeout", bid, elapsedTime);
+    const eventTimestamp = extractEventTimestamp(
+      "bidTimeout",
+      bid,
+      elapsedTime
+    );
     return {
       ...getBidData(bid, "bidTimeout"),
       pbjsTimeout: bid.timeout,
@@ -123,14 +130,17 @@ export function handleBidResponse(
 }
 
 function handleAuctionEnd(
-  auctionProperties: { auctionId: string; timestamp?: number; auctionEnd?: number },
+  auctionProperties: {
+    auctionId: string;
+    timestamp?: number;
+    auctionEnd?: number;
+  },
   elapsedTime?: number
 ): void {
   // NOTE: bidWon events are emitted after this point, so they aren't marked as complete
-  // Note: auctionEnd doesn't create an event, it just marks auctions as complete and flushes
-  // But we should still track when it happened for debugging purposes
+  // Note: auctionEnd doesn't create an event, it just marks auctions as complete
+  // Batching will handle the flush automatically based on size/time triggers
   markAuctionCompleted(auctionProperties.auctionId);
-  flush();
 }
 
 // --- Subscription helpers ---
