@@ -20,6 +20,10 @@ const IP_ENDPOINT_URL = BUILD_IP_ENDPOINT_URL;
 const VERSION = BUILD_VERSION;
 const MAX_RETRIES = 3;
 
+// Batching configuration
+const BATCH_SIZE = 50;
+const BATCH_DELAY = 2000; // milliseconds
+
 // Initialize common data (static per page load)
 const pageviewId = generateUUID();
 const sessionId = getSessionId();
@@ -131,6 +135,26 @@ async function getCommonData(): Promise<{
 
 // Event buffer
 let eventQueue: AnalyticsEventData[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Schedule a flush after BATCH_DELAY
+ */
+function scheduleFlush(): void {
+  // Clear existing timer if any
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+  }
+  // Schedule new flush
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    // Don't flush if queue is empty
+    if (eventQueue.length === 0) {
+      return;
+    }
+    flush(false);
+  }, BATCH_DELAY);
+}
 
 /**
  * Add events to the buffer
@@ -138,6 +162,19 @@ let eventQueue: AnalyticsEventData[] = [];
 export function addEvents(events: AnalyticsEventData[]): void {
   if (!events || events.length === 0) return;
   eventQueue.push(...events);
+
+  // Check if we've reached batch size
+  if (eventQueue.length >= BATCH_SIZE) {
+    // Clear timer and flush immediately
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    flush(false);
+  } else {
+    // Schedule flush after delay (resets timer if already scheduled)
+    scheduleFlush();
+  }
 }
 
 /**
@@ -184,7 +221,15 @@ function sendPayload(
  * Flush all queued events - waits for IP to be fetched before sending
  */
 export async function flush(keepalive = false): Promise<void> {
-  if (eventQueue.length === 0) return;
+  // Clear timer if flush was triggered by timer
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
+  if (eventQueue.length === 0) {
+    return;
+  }
 
   // Check if we need to fetch IP (only if yotoApp.country doesn't exist)
   const win = isBrowser() ? (window as any) : null;
@@ -206,15 +251,24 @@ export async function flush(keepalive = false): Promise<void> {
   // Clear queue immediately to prevent duplicates
   const payload = [...enrichedEvents];
   eventQueue = [];
+
+  // Final safety check - don't send empty payloads
+  if (payload.length === 0) {
+    return;
+  }
+
   // Send the enriched payload
   sendPayload(payload, 0, keepalive);
-  logger.log(`[EventSender] Flushed ${payload.length} event(s)`);
 }
 
 /**
  * Reset internal state - for testing only
  */
 export function resetEventSender(): void {
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
   eventQueue = [];
   cachedIP = null;
   ipFetchPromise = null;
