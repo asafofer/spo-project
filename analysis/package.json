@@ -7,7 +7,10 @@
     "count-by-country": "bun run queries/count-by-country.ts",
     "count-by-event-type": "bun run queries/count-by-event-type.ts",
     "total-cpm-by-session": "bun run queries/total-cpm-by-session.ts",
-    "latency-vs-revenue-by-bidder": "bun run queries/latency-vs-revenue-by-bidder.ts"
+    "latency-vs-revenue-by-bidder": "bun run queries/latency-vs-revenue-by-bidder.ts",
+    "prebid-winrate": "bun run queries/prebid-winrate.ts",
+    "bidder-performance": "bun run queries/bidder-performance.ts",
+    "ml:fetch": "bun run ml-pipeline/fetch-data.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

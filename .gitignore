@@ -70,3 +70,7 @@ analysis/tests/*/results.json
 *.bak
 *.backup
 
+# Analysis data and output
+analysis/data/
+analysis/output/
+
