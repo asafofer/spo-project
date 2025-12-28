@@ -10,7 +10,8 @@
     "latency-vs-revenue-by-bidder": "bun run queries/latency-vs-revenue-by-bidder.ts",
     "prebid-winrate": "bun run queries/prebid-winrate.ts",
     "bidder-performance": "bun run queries/bidder-performance.ts",
-    "ml:fetch": "bun run ml-pipeline/fetch-data.ts"
+    "ml:fetch": "bun run ml-pipeline/fetch-data.ts",
+    "ml:fetch-bidder": "bun run ml-pipeline/fetch-bidder-training-data.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
